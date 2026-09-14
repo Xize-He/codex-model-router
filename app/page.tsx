@@ -220,14 +220,13 @@ type AccountState = {
 };
 
 type PanelSide = 'left' | 'right';
-type InspectorSectionKey = 'usage' | 'mcp' | 'routing' | 'history' | 'workspace';
+type InspectorSectionKey = 'usage' | 'mcp' | 'routing' | 'workspace';
 type InspectorSections = Record<InspectorSectionKey, boolean>;
 
 const CLOSED_INSPECTOR_SECTIONS: InspectorSections = {
   usage: false,
   mcp: false,
   routing: false,
-  history: false,
   workspace: false,
 };
 
@@ -2599,30 +2598,6 @@ export default function Home() {
                   判断依据：实时 Codex
                   模型目录中的官方简介、支持的推理强度，以及每个档位的自定义描述。
                 </p>
-                <div className="routing-tier-toolbar">
-                  <span>档位数量</span>
-                  <div>
-                    <button
-                      type="button"
-                      aria-label="减少一个档位"
-                      title="删除最后一个档位"
-                      disabled={routingTiers.length <= 2 || !!state?.activeId || !!routingBusy}
-                      onClick={() => removeRoutingTier(routingTiers.length - 1)}
-                    >
-                      −
-                    </button>
-                    <strong>{routingTiers.length}</strong>
-                    <button
-                      type="button"
-                      aria-label="增加一个档位"
-                      title="增加一个档位"
-                      disabled={routingTiers.length >= 12 || !!state?.activeId || !!routingBusy}
-                      onClick={addRoutingTier}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
                 <div className="routing-tier-list">
                   {routingTiers.map((tier, index) => (
                     <details className="routing-tier-card" key={tier.level}>
@@ -2707,50 +2682,16 @@ export default function Home() {
                       </div>
                     </details>
                   ))}
+                  <button
+                    type="button"
+                    className="routing-tier-add"
+                    disabled={routingTiers.length >= 12 || !!state?.activeId || !!routingBusy}
+                    onClick={addRoutingTier}
+                  >
+                    <Plus size={14} />
+                    添加档位
+                  </button>
                 </div>
-              </div>
-            </details>
-          </section>
-          <section>
-            <details
-              className="inspector-details"
-              open={inspectorSections.history}
-              onToggle={(event) => rememberInspectorSection('history', event.currentTarget.open)}
-            >
-              <summary className="inspector-section-summary">
-                <span className="inspector-section-title">
-                  <History size={17} />
-                  原生历史
-                </span>
-                <ChevronRight className="inspector-section-chevron" size={14} />
-              </summary>
-              <div className="inspector-section-content">
-            <div className="section-action">
-              <span>
-                {state?.history.lastSyncedAt
-                  ? `同步于 ${new Date(state.history.lastSyncedAt).toLocaleTimeString()}`
-                  : '尚未同步'}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="刷新原生历史"
-                onClick={() => void refreshSessions()}
-                disabled={state?.history.loading || state?.history.occupancyLoading}
-              >
-                <RefreshCw
-                  size={15}
-                  className={state?.history.loading || state?.history.occupancyLoading ? 'spin' : ''}
-                />
-              </Button>
-            </div>
-            <p>
-              侧栏同时显示 Codex 桌面版、IDE、CLI
-              和本工作台的原生会话。打开旧会话时才读取完整内容。
-            </p>
-            {state?.history.truncated && (
-              <p>历史较多，本次只载入最近 1000 条。</p>
-            )}
               </div>
             </details>
           </section>

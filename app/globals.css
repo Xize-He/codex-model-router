@@ -1227,51 +1227,7 @@ a,
   min-width: 230px;
 }
 
-.routing-tier-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 7px 0 9px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.routing-tier-toolbar > div {
-  display: inline-grid;
-  grid-template-columns: 28px 32px 28px;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-subtle);
-}
-
-.routing-tier-toolbar button {
-  width: 28px;
-  height: 27px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 17px;
-  line-height: 1;
-}
-
-.routing-tier-toolbar button:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-
-.routing-tier-toolbar button:disabled { opacity: .35; }
-.routing-tier-toolbar strong {
-  text-align: center;
-  color: var(--text-strong);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.routing-tier-list { display: grid; gap: 6px; }
+.routing-tier-list { display: grid; gap: 6px; margin-top: 8px; }
 .routing-tier-card {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1402,3 +1358,26 @@ a,
 
 .routing-tier-actions button.danger:hover:not(:disabled) { color: var(--danger); }
 .routing-tier-actions button:disabled { opacity: .3; }
+
+.routing-tier-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-top: 2px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.routing-tier-add:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.routing-tier-add:disabled { opacity: .35; }
