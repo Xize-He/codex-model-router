@@ -53,6 +53,9 @@ import {
   LogOut,
   KeyRound,
   ExternalLink,
+  PanelLeftClose,
+  PanelLeftOpen,
+  SquarePen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -583,6 +586,7 @@ export default function Home() {
     [inspectorSections, setInspectorSections] = useState(storedInspectorSections),
     [online, setOnline] = useState(false),
     [historySearch, setHistorySearch] = useState(''),
+    [historySearchOpen, setHistorySearchOpen] = useState(false),
     [opening, setOpening] = useState(''),
     [copiedTask, setCopiedTask] = useState(''),
     [ratingTask, setRatingTask] = useState(''),
@@ -601,6 +605,14 @@ export default function Home() {
     [hoveredTurnIndex, setHoveredTurnIndex] = useState<number | null>(null),
     [sidebarWidth, setSidebarWidth] = useState(() => storedPanelWidth('left')),
     [inspectorWidth, setInspectorWidth] = useState(() => storedPanelWidth('right')),
+    [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+      try {
+        return typeof window !== 'undefined' &&
+          localStorage.getItem('model-router-sidebar-collapsed') === 'true';
+      } catch {
+        return false;
+      }
+    }),
     [conversationMode, setConversationMode] = useState<'flow' | 'cards'>(() => {
       try {
         return typeof window !== 'undefined' &&
@@ -653,6 +665,13 @@ export default function Home() {
   }, [focusMode]);
   useEffect(() => {
     try {
+      localStorage.setItem('model-router-sidebar-collapsed', String(sidebarCollapsed));
+    } catch {
+      /* Sidebar collapsing still works when browser storage is unavailable. */
+    }
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
       localStorage.setItem('model-router-inspector-sections', JSON.stringify(inspectorSections));
     } catch {
       /* The status sections still work when browser storage is unavailable. */
@@ -662,6 +681,7 @@ export default function Home() {
     sessionViewRef = useRef<'active' | 'archived'>('active'),
     fileInput = useRef<HTMLInputElement>(null),
     composerInput = useRef<HTMLTextAreaElement>(null),
+    historySearchInput = useRef<HTMLInputElement>(null),
     accountMenuRef = useRef<HTMLDivElement>(null),
     conversationRef = useRef<HTMLDivElement>(null),
     workbenchRef = useRef<HTMLDivElement>(null),
@@ -750,12 +770,17 @@ export default function Home() {
   const visibleSessions = useMemo(
     () =>
       (state?.sessions || []).filter(
-        (item) =>
-          Boolean(item.archived) === (sessionView === 'archived') &&
-          item.title.toLowerCase().includes(historySearch.trim().toLowerCase()),
+        (item) => Boolean(item.archived) === (sessionView === 'archived'),
       ),
-    [state?.sessions, historySearch, sessionView],
+    [state?.sessions, sessionView],
   );
+  const searchResults = useMemo(() => {
+    const query = historySearch.trim().toLocaleLowerCase();
+    return [...(state?.sessions || [])]
+      .filter((item) => !query || item.title.toLocaleLowerCase().includes(query))
+      .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+      .slice(0, 30);
+  }, [state?.sessions, historySearch]);
   const activeSessionCount = state?.sessions.filter((item) => !item.archived).length || 0,
     archivedSessionCount = state?.sessions.filter((item) => item.archived).length || 0;
   const primaryLimit =
@@ -861,6 +886,18 @@ export default function Home() {
       document.removeEventListener('keydown', closeWithEscape);
     };
   }, [accountMenu]);
+  useEffect(() => {
+    if (!historySearchOpen) return;
+    const focus = window.requestAnimationFrame(() => historySearchInput.current?.focus());
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setHistorySearchOpen(false);
+    };
+    document.addEventListener('keydown', closeWithEscape);
+    return () => {
+      window.cancelAnimationFrame(focus);
+      document.removeEventListener('keydown', closeWithEscape);
+    };
+  }, [historySearchOpen]);
   useEffect(() => {
     if (
       !session?.native ||
@@ -1090,6 +1127,22 @@ export default function Home() {
     if (view === 'archived' && !state?.history.archivedLoaded && !state?.history.archivedLoading)
       await action('history/archived');
   }
+  async function openSessionSearch() {
+    setHistorySearch('');
+    setHistorySearchOpen(true);
+    if (!state?.history.archivedLoaded && !state?.history.archivedLoading) {
+      await action('history/archived');
+    }
+  }
+  function chooseSearchResult(target: Session) {
+    const view = target.archived ? 'archived' : 'active';
+    sessionViewRef.current = view;
+    setSessionView(view);
+    setSelected(target.id);
+    setSessionMenu('');
+    setHistorySearchOpen(false);
+    setHistorySearch('');
+  }
   async function manageSession(target: Session, operation: 'archive' | 'unarchive') {
     setSessionActionBusy(target.id);
     try {
@@ -1269,22 +1322,47 @@ export default function Home() {
   return (
     <div
       ref={workbenchRef}
-      className={`workbench ${focusMode ? 'focus-mode' : ''}`}
+      className={`workbench ${focusMode ? 'focus-mode' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
       style={{
         '--sidebar-width': `${sidebarWidth}px`,
         '--inspector-width': `${inspectorWidth}px`,
       } as CSSProperties}
     >
       <aside className="sidebar">
-        <div className="sidebar-title">Codex</div>
-        <Button
-          className="new-chat"
-          onClick={create}
-          disabled={busy || !online}
-        >
-          <Plus size={18} />
-          新对话
-        </Button>
+        <div className="sidebar-header">
+          <div className="sidebar-title">Codex</div>
+          <div className="sidebar-header-actions">
+            <button
+              type="button"
+              aria-label="搜索会话"
+              title="搜索会话"
+              onClick={() => void openSessionSearch()}
+            >
+              <Search size={17} />
+            </button>
+            <button
+              type="button"
+              aria-label="收起左侧栏"
+              title="收起左侧栏"
+              onClick={() => {
+                setSidebarCollapsed(true);
+                setHistorySearchOpen(false);
+              }}
+            >
+              <PanelLeftClose size={17} />
+            </button>
+          </div>
+        </div>
+        <div className="sidebar-primary-actions">
+          <Button
+            className="new-chat"
+            onClick={create}
+            disabled={busy || !online}
+          >
+            <SquarePen size={17} />
+            新对话
+          </Button>
+        </div>
         <div className="sidebar-label">
           <span>
             会话管理
@@ -1316,15 +1394,6 @@ export default function Home() {
             已归档 <b>{archivedSessionCount}</b>
           </button>
         </div>
-        <label className="history-search">
-          <Search size={14} />
-          <input
-            aria-label="搜索会话"
-            placeholder="搜索会话"
-            value={historySearch}
-            onChange={(e) => setHistorySearch(e.target.value)}
-          />
-        </label>
         <nav className="session-list" aria-label="对话记录">
           {!visibleSessions.length && (
             <div className="session-empty">
@@ -1588,6 +1657,18 @@ export default function Home() {
       <main className="main">
         <header>
           <div className="header-title">
+            {sidebarCollapsed && !focusMode && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="sidebar-expand"
+                aria-label="展开左侧栏"
+                title="展开左侧栏"
+                onClick={() => setSidebarCollapsed(false)}
+              >
+                <PanelLeftOpen size={17} />
+              </Button>
+            )}
             {session?.title || '新对话'}
             <span className="version">V3</span>
             {session?.occupied && (
@@ -1669,6 +1750,57 @@ export default function Home() {
             </Button>
           </div>
         </header>
+        {historySearchOpen && (
+          <div className="history-search-overlay">
+            <button
+              type="button"
+              className="history-search-dismiss"
+              aria-label="关闭会话搜索"
+              onClick={() => setHistorySearchOpen(false)}
+            />
+            <dialog open className="history-search-dialog" aria-label="搜索会话">
+              <div className="history-search-dialog-input">
+                <Search size={17} />
+                <input
+                  ref={historySearchInput}
+                  aria-label="搜索会话"
+                  placeholder="搜索对话"
+                  value={historySearch}
+                  onChange={(event) => setHistorySearch(event.target.value)}
+                />
+                <button
+                  type="button"
+                  aria-label="关闭会话搜索"
+                  title="关闭"
+                  onClick={() => setHistorySearchOpen(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="history-search-results" aria-label="搜索结果">
+                {!searchResults.length && <p>没有找到相关对话</p>}
+                {searchResults.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={item.id === selected ? 'selected' : ''}
+                    onClick={() => chooseSearchResult(item)}
+                  >
+                    <span>{item.title}</span>
+                    <small>
+                      {item.archived
+                        ? '已归档'
+                        : new Date(item.updatedAt || item.createdAt).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            </dialog>
+          </div>
+        )}
         {(error || state?.error) && (
           <div className="alert" role="alert">
             <CircleAlert size={18} />
