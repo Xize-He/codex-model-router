@@ -5,13 +5,38 @@ import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Engine, collectFileChanges, approvalSettings, parseRoute, pickRoute, buildRouteCatalog, mapNativeTurn, normalizeRateLimits, normalizeAccount } from '../server/engine.mjs';
 import { McpClient, McpRegistry } from '../server/mcp.mjs';
-import { normalizeMcpServers } from '../server/config.mjs';
+import { loadRouterConfig, normalizeMcpServers } from '../server/config.mjs';
 import { createPatch } from 'diff';
 
 const config = { classifier: 'classifier', classifierEffort: 'medium', mcpUrl: 'http://127.0.0.1:1/mcp', mcpTokenEnv: 'ROUTER_TEST_TOKEN', routes: { instant: { model: 'small', effort: 'low' }, light: { model: 'small', effort: 'low' }, focused: { model: 'small', effort: 'low' }, standard: { model: 'big', effort: 'medium' }, agentic: { model: 'big', effort: 'medium' }, advanced: { model: 'big', effort: 'high' }, expert: { model: 'big', effort: 'high' }, extreme: { model: 'big', effort: 'high' } } };
 const routerConfig = JSON.parse(readFileSync(new URL('../router.config.json', import.meta.url), 'utf8'));
 const models = [{ model: 'small', displayName: 'Small', description: 'Fast model from the live catalog', defaultReasoningEffort: 'low', supportedReasoningEfforts: [{ reasoningEffort: 'low' }] }, { model: 'big', displayName: 'Big', description: 'Capable model from the live catalog', defaultReasoningEffort: 'medium', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }, { reasoningEffort: 'high' }] }, { model: 'classifier', displayName: 'Classifier', description: 'Classifier model', defaultReasoningEffort: 'medium', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }] }];
 function engine() { const dir = path.resolve('work/unit-tests'); mkdirSync(dir, { recursive: true }); const e = new Engine(mkdtempSync(path.join(dir, 'run-')), config); e.models = models; e.status = 'ready'; return e; }
+test('dynamic route count and order survive a config reload', () => {
+  const dir = mkdtempSync(path.join(path.resolve('work/unit-tests'), 'config-'));
+  writeFileSync(path.join(dir, 'router.config.json'), JSON.stringify({
+    routes: {
+      first: { model: 'small', effort: 'low' },
+      middle: { model: 'big', effort: 'medium' },
+      last: { model: 'big', effort: 'high' },
+    },
+    routeLabels: { first: '第一档', middle: '第二档', last: '第三档' },
+  }));
+  writeFileSync(path.join(dir, 'router.config.local.json'), JSON.stringify({
+    routeOrder: ['last', 'first'],
+    routes: {
+      first: { model: 'small', effort: 'low' },
+      last: { model: 'big', effort: 'high' },
+    },
+    routeLabels: { last: '优先处理' },
+    routeGuidance: { last: '需要更强推理。' },
+  }));
+  const loaded = loadRouterConfig(dir);
+  assert.deepEqual(Object.keys(loaded.routes), ['last', 'first']);
+  assert.equal(loaded.routeLabels.last, '优先处理');
+  assert.equal(loaded.routeGuidance.last, '需要更强推理。');
+  assert.equal(Object.hasOwn(loaded.routes, 'middle'), false);
+});
 test('Approve for me uses Codex auto-review without widening the sandbox', () => {
   assert.deepEqual(approvalSettings('ask'), { approvalPolicy: 'on-request', approvalsReviewer: 'user' });
   assert.deepEqual(approvalSettings('approve-for-me'), { approvalPolicy: 'on-request', approvalsReviewer: 'auto_review' });
@@ -78,6 +103,9 @@ test('classifier result is constrained and unavailable models do not silently fa
   assert.equal(catalog.length, 8);
   assert.equal(catalog[0].description, 'Fast model from the live catalog');
   assert.equal(catalog[7].guidance.includes('极高难度'), true);
+  const customCatalog = buildRouteCatalog({ ...config, routeLabels: { instant: '秒答' }, routeGuidance: { instant: '只处理一句话问题' } }, models);
+  assert.equal(customCatalog[0].label, '秒答');
+  assert.equal(customCatalog[0].guidance, '只处理一句话问题');
 });
 test('routing choices are validated and persisted as local overrides', () => {
   const e = engine();
@@ -90,6 +118,20 @@ test('routing choices are validated and persisted as local overrides', () => {
   assert.deepEqual(saved.routes.light, { model: 'big', effort: 'medium' });
   assert.throws(() => e.updateRoutingConfig({ level: 'missing', model: 'big', effort: 'medium' }), /档位无效/);
   assert.throws(() => e.updateRoutingConfig({ level: 'light', model: 'small', effort: 'high' }), /不支持/);
+  e.updateRoutingConfig({ tiers: [
+    { level: 'simple', label: '简单', guidance: '无需工具的简单问题', model: 'small', effort: 'low' },
+    { level: 'hard', label: '困难', guidance: '需要多步验证的困难问题', model: 'big', effort: 'high' },
+  ] });
+  assert.deepEqual(Object.keys(e.config.routes), ['simple', 'hard']);
+  assert.equal(e.publicState().config.routeLabels.simple, '简单');
+  assert.equal(e.publicState().config.routeGuidance.hard, '需要多步验证的困难问题');
+  const resized = JSON.parse(readFileSync(path.join(e.root, 'router.config.local.json'), 'utf8'));
+  assert.deepEqual(resized.routeOrder, ['simple', 'hard']);
+  assert.throws(() => e.updateRoutingConfig({ tiers: [{ level: 'only', label: '唯一', guidance: '不允许只有一档', model: 'small', effort: 'low' }] }), /2 到 12/);
+  assert.throws(() => e.updateRoutingConfig({ tiers: [
+    { level: 'constructor', label: '危险', guidance: '无效标识', model: 'small', effort: 'low' },
+    { level: 'safe', label: '安全', guidance: '有效标识', model: 'small', effort: 'low' },
+  ] }), /标识无效/);
 });
 test('default automatic routing uses the agreed eight model and effort profiles', () => {
   assert.equal(routerConfig.classifier, 'gpt-5.6-sol');

@@ -32,7 +32,22 @@ export function loadRouterConfig(root) {
   const base = readJson(path.join(root, 'router.config.json'));
   const localPath = path.join(root, 'router.config.local.json');
   const local = existsSync(localPath) ? readJson(localPath) : {};
-  const merged = { ...base, ...local, routes: { ...(base.routes || {}), ...(local.routes || {}) } };
+  const legacyRoutes = { ...base.routes, ...local.routes };
+  const routeOrder = Array.isArray(local.routeOrder) ? local.routeOrder : Object.keys(legacyRoutes);
+  const reservedLevels = new Set(['__proto__', 'prototype', 'constructor']);
+  const routes = Object.fromEntries(routeOrder.filter(level =>
+    typeof level === 'string' &&
+    /^[a-z0-9][a-z0-9_-]{0,31}$/.test(level) &&
+    !reservedLevels.has(level) &&
+    Object.prototype.hasOwnProperty.call(legacyRoutes, level)
+  ).map(level => [level, legacyRoutes[level]]));
+  const merged = {
+    ...base,
+    ...local,
+    routes,
+    routeLabels: { ...base.routeLabels, ...local.routeLabels },
+    routeGuidance: { ...base.routeGuidance, ...local.routeGuidance },
+  };
   merged.mcpServers = normalizeMcpServers(merged);
   delete merged.mcpUrl;
   delete merged.mcpTokenEnv;
@@ -47,6 +62,9 @@ export function saveRoutingConfig(root, config) {
     classifier: config.classifier,
     classifierEffort: config.classifierEffort,
     routes: config.routes,
+    routeOrder: Object.keys(config.routes || {}),
+    routeLabels: config.routeLabels || {},
+    routeGuidance: config.routeGuidance || {},
   };
   const tempPath = `${localPath}.tmp`;
   writeFileSync(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');

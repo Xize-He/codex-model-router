@@ -56,6 +56,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   SquarePen,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -188,6 +190,13 @@ type RateLimit = {
   reached?: string | null;
   credits?: { unlimited?: boolean; balance?: string | number | null } | null;
 };
+type RouteTier = {
+  level: string;
+  label: string;
+  guidance: string;
+  model: string;
+  effort: string;
+};
 type AccountState = {
   loading: boolean;
   authenticated: boolean;
@@ -292,6 +301,8 @@ type State = {
     classifier: string;
     classifierEffort?: string;
     routes: Record<string, { model: string; effort: string }>;
+    routeLabels?: Record<string, string>;
+    routeGuidance?: Record<string, string>;
   };
 };
 const statusText: Record<string, string> = {
@@ -788,6 +799,13 @@ export default function Home() {
     state?.usage.limits[0];
   const classifierModel = state?.models.find((item) => item.model === state.config.classifier);
   const classifierEffort = state?.config.classifierEffort || classifierModel?.defaultReasoningEffort || '';
+  const routingTiers: RouteTier[] = Object.entries(state?.config.routes || {}).map(([level, route]) => ({
+    level,
+    label: state?.config.routeLabels?.[level] || levelText[level] || level,
+    guidance: state?.config.routeGuidance?.[level] || '',
+    model: route.model,
+    effort: route.effort,
+  }));
   const contextTokens = session?.context?.last?.totalTokens || 0,
     contextWindow = session?.context?.modelContextWindow || 0;
   const contextPercent = contextWindow
@@ -1017,7 +1035,16 @@ export default function Home() {
   }
   async function updateRoutingConfig(
     key: string,
-    input: { classifier?: string; classifierEffort?: string; level?: string; model?: string; effort?: string },
+    input: {
+      classifier?: string;
+      classifierEffort?: string;
+      level?: string;
+      model?: string;
+      effort?: string;
+      label?: string;
+      guidance?: string;
+      tiers?: RouteTier[];
+    },
   ) {
     try {
       setError('');
@@ -1028,6 +1055,53 @@ export default function Home() {
     } finally {
       setRoutingBusy('');
     }
+  }
+  function saveRouteText(tier: RouteTier, field: 'label' | 'guidance', value: string) {
+    const normalized = value.trim();
+    if (!normalized || normalized === tier[field]) return;
+    void updateRoutingConfig(`${tier.level}:${field}`, {
+      level: tier.level,
+      model: tier.model,
+      effort: tier.effort,
+      [field]: normalized,
+    });
+  }
+  function replaceRoutingTiers(key: string, tiers: RouteTier[]) {
+    void updateRoutingConfig(key, { tiers });
+  }
+  function moveRoutingTier(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= routingTiers.length) return;
+    const next = [...routingTiers];
+    [next[index], next[target]] = [next[target], next[index]];
+    replaceRoutingTiers('tiers:reorder', next);
+  }
+  function addRoutingTier() {
+    if (routingTiers.length >= 12) return;
+    const previous = routingTiers.at(-1);
+    const fallbackModel = previous?.model || state?.models[0]?.model;
+    const fallbackCatalog = state?.models.find((item) => item.model === fallbackModel);
+    const fallbackEffort = previous?.effort || fallbackCatalog?.defaultReasoningEffort || '';
+    if (!fallbackModel || !fallbackEffort) return;
+    let sequence = routingTiers.length + 1;
+    while (routingTiers.some((tier) => tier.level === `custom-${sequence}`)) sequence += 1;
+    const level = `custom-${sequence}`;
+    replaceRoutingTiers('tiers:add', [
+      ...routingTiers,
+      {
+        level,
+        label: `自定义任务 ${routingTiers.length + 1}`,
+        guidance: previous
+          ? `比“${previous.label}”更复杂、影响范围更广或错误成本更高的任务`
+          : '根据任务复杂度、工具步骤、影响范围和错误成本选择该档位',
+        model: fallbackModel,
+        effort: fallbackEffort,
+      },
+    ]);
+  }
+  function removeRoutingTier(index: number) {
+    if (routingTiers.length <= 2) return;
+    replaceRoutingTiers('tiers:remove', routingTiers.filter((_, tierIndex) => tierIndex !== index));
   }
   async function startLogin(type: 'chatgpt' | 'chatgptDeviceCode' | 'apiKey') {
     try {
@@ -1978,7 +2052,7 @@ export default function Home() {
                         </summary>
                         <div className="route-reason">
                           <span>
-                            {levelText[task.route.level] || task.route.level}
+                            {state?.config.routeLabels?.[task.route.level] || levelText[task.route.level] || task.route.level}
                           </span>
                           <p>{task.route.reason}</p>
                         </div>
@@ -2503,7 +2577,7 @@ export default function Home() {
               <div className="routing-details-content">
                 <p>
                   手动模式可选择账号当前返回的全部 {state?.models.length || 0}{' '}
-                  个模型及其推理强度。自动模式按任务难度使用下面八档。
+                  个模型及其推理强度。自动模式按任务难度使用下面 {routingTiers.length} 档。
                 </p>
                 {state?.config.classifier && classifierEffort && (
                   <div className="routing-config-row classifier-row">
@@ -2523,27 +2597,117 @@ export default function Home() {
                 )}
                 <p>
                   判断依据：实时 Codex
-                  模型目录中的官方简介、支持的推理强度，以及八档任务规则。
+                  模型目录中的官方简介、支持的推理强度，以及每个档位的自定义描述。
                 </p>
-                {Object.entries(state?.config.routes || {}).map(
-                  ([level, route]) => (
-                    <div className="routing-row" key={level}>
-                      <span>{levelText[level]}</span>
-                      <RoutingModelSelect
-                        models={state?.models || []}
-                        model={route.model}
-                        effort={route.effort}
-                        label={`选择${levelText[level] || level}使用的模型和推理强度`}
-                        disabled={!!state?.activeId || !!routingBusy}
-                        onChange={(nextModel, nextEffort) => void updateRoutingConfig(level, {
-                          level,
-                          model: nextModel,
-                          effort: nextEffort,
-                        })}
-                      />
-                    </div>
-                  ),
-                )}
+                <div className="routing-tier-toolbar">
+                  <span>档位数量</span>
+                  <div>
+                    <button
+                      type="button"
+                      aria-label="减少一个档位"
+                      title="删除最后一个档位"
+                      disabled={routingTiers.length <= 2 || !!state?.activeId || !!routingBusy}
+                      onClick={() => removeRoutingTier(routingTiers.length - 1)}
+                    >
+                      −
+                    </button>
+                    <strong>{routingTiers.length}</strong>
+                    <button
+                      type="button"
+                      aria-label="增加一个档位"
+                      title="增加一个档位"
+                      disabled={routingTiers.length >= 12 || !!state?.activeId || !!routingBusy}
+                      onClick={addRoutingTier}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="routing-tier-list">
+                  {routingTiers.map((tier, index) => (
+                    <details className="routing-tier-card" key={tier.level}>
+                      <summary>
+                        <span className="routing-tier-index">{index + 1}</span>
+                        <span className="routing-tier-summary">
+                          <strong>{tier.label}</strong>
+                          <small>{shortModel(tier.model)} · {tier.effort}</small>
+                        </span>
+                        <ChevronRight className="routing-tier-chevron" size={14} />
+                      </summary>
+                      <div className="routing-tier-editor">
+                        <label>
+                          <span>名称</span>
+                          <input
+                            key={`label-${tier.level}-${tier.label}`}
+                            defaultValue={tier.label}
+                            maxLength={30}
+                            disabled={!!state?.activeId || !!routingBusy}
+                            onBlur={(event) => {
+                              if (!event.currentTarget.value.trim()) event.currentTarget.value = tier.label;
+                              else saveRouteText(tier, 'label', event.currentTarget.value);
+                            }}
+                          />
+                        </label>
+                        <label>
+                          <span>判断描述</span>
+                          <textarea
+                            key={`guidance-${tier.level}-${tier.guidance}`}
+                            defaultValue={tier.guidance}
+                            maxLength={600}
+                            rows={3}
+                            disabled={!!state?.activeId || !!routingBusy}
+                            onBlur={(event) => {
+                              if (!event.currentTarget.value.trim()) event.currentTarget.value = tier.guidance;
+                              else saveRouteText(tier, 'guidance', event.currentTarget.value);
+                            }}
+                          />
+                        </label>
+                        <div className="routing-tier-model">
+                          <span>执行模型</span>
+                          <RoutingModelSelect
+                            models={state?.models || []}
+                            model={tier.model}
+                            effort={tier.effort}
+                            label={`选择${tier.label}使用的模型和推理强度`}
+                            disabled={!!state?.activeId || !!routingBusy}
+                            onChange={(nextModel, nextEffort) => void updateRoutingConfig(tier.level, {
+                              level: tier.level,
+                              model: nextModel,
+                              effort: nextEffort,
+                            })}
+                          />
+                        </div>
+                        <div className="routing-tier-actions">
+                          <button
+                            type="button"
+                            aria-label={`上移${tier.label}`}
+                            disabled={index === 0 || !!state?.activeId || !!routingBusy}
+                            onClick={() => moveRoutingTier(index, -1)}
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`下移${tier.label}`}
+                            disabled={index === routingTiers.length - 1 || !!state?.activeId || !!routingBusy}
+                            onClick={() => moveRoutingTier(index, 1)}
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            aria-label={`删除${tier.label}`}
+                            disabled={routingTiers.length <= 2 || !!state?.activeId || !!routingBusy}
+                            onClick={() => removeRoutingTier(index)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </details>
+                  ))}
+                </div>
               </div>
             </details>
           </section>

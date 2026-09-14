@@ -166,11 +166,23 @@ const defaultRouteGuidance = {
   expert: '架构设计、高风险修改、复杂权衡或高度模糊的端到端任务，错误代价较高',
   extreme: '极高难度的大型改造、关键技术决策或深度研究，存在强歧义、广泛影响或很高错误成本',
 };
+const defaultRouteLabels = {
+  instant: '极速任务', light: '轻量任务', focused: '小型开发', standard: '常规开发',
+  agentic: '多步执行', advanced: '困难任务', expert: '专家任务', extreme: '极难任务',
+};
+function stripControls(value, allowWhitespace = false) {
+  return Array.from(String(value)).filter(character => {
+    const code = character.charCodeAt(0);
+    return code > 31 && code !== 127 || allowWhitespace && (code === 9 || code === 10 || code === 13);
+  }).join('');
+}
+const cleanRouteLabel = (value, fallback = '') => stripControls(value || fallback).trim().slice(0, 30);
+const cleanRouteGuidance = value => stripControls(value || '', true).trim().slice(0, 600);
 export function buildRouteCatalog(config, models) {
   return Object.entries(config.routes || {}).map(([level, route], index) => {
     const model = models.find(item => item.model === route.model);
     return {
-      level, order: index + 1, model: route.model, effort: route.effort,
+      level, order: index + 1, label: config.routeLabels?.[level] || defaultRouteLabels[level] || level, model: route.model, effort: route.effort,
       displayName: model?.displayName || route.model,
       description: String(model?.description || '').slice(0, 800),
       supportedReasoningEfforts: (model?.supportedReasoningEfforts || []).map(item => item.reasoningEffort),
@@ -221,7 +233,14 @@ export class Engine extends EventEmitter {
   allSessions() { return [...this.sessions, ...this.nativeSessions, ...this.nativeArchivedSessions].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)); }
   findSession(id) { return this.sessions.find(s => s.id === id) || this.nativeSessions.find(s => s.id === id) || this.nativeArchivedSessions.find(s => s.id === id); }
   publicState() {
-    const config = { classifier: this.config.classifier, classifierEffort: this.config.classifierEffort, routes: this.config.routes };
+    const levels = Object.keys(this.config.routes || {});
+    const config = {
+      classifier: this.config.classifier,
+      classifierEffort: this.config.classifierEffort,
+      routes: this.config.routes,
+      routeLabels: Object.fromEntries(levels.map(level => [level, this.config.routeLabels?.[level] || defaultRouteLabels[level] || level])),
+      routeGuidance: Object.fromEntries(levels.map(level => [level, this.config.routeGuidance?.[level] || defaultRouteGuidance[level] || ''])),
+    };
     const mcpServers = this.mcpStatuses.map(server => ({ name: server.name || server.configuredName, connected: server.connected, enabled: server.enabled }));
     return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: this.models, config, cwd: this.cwd,
       account: this.account, mcpServers, sessions: this.allSessions(), history: this.history, usage: this.usage, activeId: this.active?.task.id || null,
@@ -232,6 +251,8 @@ export class Engine extends EventEmitter {
     const next = {
       ...this.config,
       routes: Object.fromEntries(Object.entries(this.config.routes || {}).map(([level, route]) => [level, { ...route }])),
+      routeLabels: { ...this.config.routeLabels },
+      routeGuidance: { ...this.config.routeGuidance },
     };
     let changed = false;
     const validate = (modelId, effort) => {
@@ -258,13 +279,45 @@ export class Engine extends EventEmitter {
       const effort = String(input.effort || '');
       validate(model, effort);
       next.routes[level] = { model, effort };
+      if (input.label !== undefined) {
+        const label = cleanRouteLabel(input.label);
+        if (!label) throw new Error('档位名称不能为空');
+        next.routeLabels[level] = label;
+      }
+      if (input.guidance !== undefined) {
+        const guidance = cleanRouteGuidance(input.guidance);
+        if (!guidance) throw new Error('档位描述不能为空');
+        next.routeGuidance[level] = guidance;
+      }
+      changed = true;
+    }
+    if (input.tiers !== undefined) {
+      if (!Array.isArray(input.tiers) || input.tiers.length < 2 || input.tiers.length > 12) throw new Error('自动路由需要 2 到 12 个档位');
+      const routes = {}, routeLabels = {}, routeGuidance = {}, seen = new Set(), reserved = new Set(['__proto__', 'prototype', 'constructor']);
+      for (const raw of input.tiers) {
+        const level = String(raw?.level || '').toLowerCase();
+        if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(level) || reserved.has(level) || seen.has(level)) throw new Error('档位标识无效或重复');
+        seen.add(level);
+        const model = String(raw?.model || '');
+        const effort = String(raw?.effort || '');
+        validate(model, effort);
+        const label = cleanRouteLabel(raw?.label, defaultRouteLabels[level] || level);
+        const guidance = cleanRouteGuidance(raw?.guidance || defaultRouteGuidance[level]);
+        if (!label || !guidance) throw new Error('档位名称和描述不能为空');
+        routes[level] = { model, effort };
+        routeLabels[level] = label;
+        routeGuidance[level] = guidance;
+      }
+      next.routes = routes;
+      next.routeLabels = routeLabels;
+      next.routeGuidance = routeGuidance;
       changed = true;
     }
     if (!changed) throw new Error('没有可保存的路由配置');
     saveRoutingConfig(this.root, next);
     this.config = next;
     this.changed();
-    return { ok: true, config: { classifier: next.classifier, classifierEffort: next.classifierEffort, routes: next.routes } };
+    return { ok: true, config: { classifier: next.classifier, classifierEffort: next.classifierEffort, routes: next.routes, routeLabels: next.routeLabels, routeGuidance: next.routeGuidance } };
   }
   changed() { this.emit('change'); }
   save() {

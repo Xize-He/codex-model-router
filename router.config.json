@@ -3,6 +3,26 @@
   "mcpServers": [],
   "classifier": "gpt-5.6-sol",
   "classifierEffort": "medium",
+  "routeLabels": {
+    "instant": "极速任务",
+    "light": "轻量任务",
+    "focused": "小型开发",
+    "standard": "常规开发",
+    "agentic": "多步执行",
+    "advanced": "困难任务",
+    "expert": "专家任务",
+    "extreme": "极难任务"
+  },
+  "routeGuidance": {
+    "instant": "单一、明确、低风险的短问答、翻译、改写或格式整理，不需要工具或只需一次简单读取",
+    "light": "简单分析、单文件读取、简短总结或少量信息整理，范围清晰且不需要修改代码",
+    "focused": "目标明确的单文件修改、小型脚本或局部修复，步骤较少、风险较低且不需要广泛验证",
+    "standard": "常规功能开发、修复并运行测试或少量跨文件修改，范围清楚但需要稳定的实现与验证",
+    "agentic": "较大范围的跨文件修改、连续工具操作或中等规模实现，需要自主完成多个相互依赖的步骤",
+    "advanced": "困难调试、复杂分析、架构权衡、较长上下文或需求存在较强歧义，需要更强的综合推理",
+    "expert": "架构设计、高风险修改、复杂权衡或高度模糊的端到端任务，错误代价较高",
+    "extreme": "极高难度的大型改造、关键技术决策或深度研究，存在强歧义、广泛影响或很高错误成本"
+  },
   "routes": {
     "instant": { "model": "gpt-5.6-luna", "effort": "low" },
     "light": { "model": "gpt-5.6-luna", "effort": "medium" },
