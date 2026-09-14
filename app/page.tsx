@@ -56,8 +56,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   SquarePen,
-  ChevronUp,
-  ChevronDown,
+  GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -611,6 +610,8 @@ export default function Home() {
     [accountBusy, setAccountBusy] = useState(''),
     [routingBusy, setRoutingBusy] = useState(''),
     [routeLabelDrafts, setRouteLabelDrafts] = useState<Record<string, string>>({}),
+    [draggedTier, setDraggedTier] = useState(''),
+    [dragTarget, setDragTarget] = useState<{ level: string; position: 'before' | 'after' } | null>(null),
     [apiKey, setApiKey] = useState(''),
     [activeTurnIndex, setActiveTurnIndex] = useState(0),
     [hoveredTurnIndex, setHoveredTurnIndex] = useState<number | null>(null),
@@ -1044,6 +1045,7 @@ export default function Home() {
       label?: string;
       guidance?: string;
       tiers?: RouteTier[];
+      routeOrder?: string[];
     },
   ): Promise<boolean> {
     try {
@@ -1070,12 +1072,16 @@ export default function Home() {
   function replaceRoutingTiers(key: string, tiers: RouteTier[]) {
     void updateRoutingConfig(key, { tiers });
   }
-  function moveRoutingTier(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= routingTiers.length) return;
+  function dropRoutingTier(sourceLevel: string, targetLevel: string, position: 'before' | 'after') {
+    if (!sourceLevel || sourceLevel === targetLevel) return;
     const next = [...routingTiers];
-    [next[index], next[target]] = [next[target], next[index]];
-    replaceRoutingTiers('tiers:reorder', next);
+    const sourceIndex = next.findIndex((tier) => tier.level === sourceLevel);
+    if (sourceIndex < 0 || !next.some((tier) => tier.level === targetLevel)) return;
+    const [moved] = next.splice(sourceIndex, 1);
+    const targetIndex = next.findIndex((tier) => tier.level === targetLevel);
+    next.splice(targetIndex + (position === 'after' ? 1 : 0), 0, moved);
+    if (next.every((tier, index) => tier.level === routingTiers[index]?.level)) return;
+    void updateRoutingConfig('tiers:reorder', { routeOrder: next.map((tier) => tier.level) });
   }
   function addRoutingTier() {
     if (routingTiers.length >= 12) return;
@@ -2604,8 +2610,55 @@ export default function Home() {
                   {routingTiers.map((tier, index) => {
                     const visibleLabel = routeLabelDrafts[tier.level] ?? tier.label;
                     return (
-                    <details className="routing-tier-card" key={tier.level}>
-                      <summary>
+                    <details
+                      className={`routing-tier-card${draggedTier === tier.level ? ' dragging' : ''}${dragTarget?.level === tier.level ? ` drop-${dragTarget.position}` : ''}`}
+                      key={tier.level}
+                    >
+                      <summary
+                        onDragOver={(event) => {
+                          if (!draggedTier || draggedTier === tier.level) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'move';
+                          const bounds = event.currentTarget.getBoundingClientRect();
+                          const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
+                          setDragTarget((current) => current?.level === tier.level && current.position === position
+                            ? current
+                            : { level: tier.level, position });
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const sourceLevel = event.dataTransfer.getData('text/plain') || draggedTier;
+                          if (dragTarget?.level === tier.level) {
+                            dropRoutingTier(sourceLevel, tier.level, dragTarget.position);
+                          }
+                          setDraggedTier('');
+                          setDragTarget(null);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="routing-tier-drag"
+                          draggable={!state?.activeId && !routingBusy}
+                          aria-label={`拖动${visibleLabel || tier.label}调整顺序`}
+                          title="拖动调整顺序"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onDragStart={(event) => {
+                            event.stopPropagation();
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', tier.level);
+                            setDraggedTier(tier.level);
+                            setDragTarget(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTier('');
+                            setDragTarget(null);
+                          }}
+                        >
+                          <GripVertical size={14} />
+                        </button>
                         <span className="routing-tier-index">{index + 1}</span>
                         <span className="routing-tier-summary">
                           <strong>{visibleLabel}</strong>
@@ -2673,22 +2726,6 @@ export default function Home() {
                           />
                         </div>
                         <div className="routing-tier-actions">
-                          <button
-                            type="button"
-                            aria-label={`上移${visibleLabel || tier.label}`}
-                            disabled={index === 0 || !!state?.activeId || !!routingBusy}
-                            onClick={() => moveRoutingTier(index, -1)}
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`下移${visibleLabel || tier.label}`}
-                            disabled={index === routingTiers.length - 1 || !!state?.activeId || !!routingBusy}
-                            onClick={() => moveRoutingTier(index, 1)}
-                          >
-                            <ChevronDown size={14} />
-                          </button>
                           <button
                             type="button"
                             className="danger"

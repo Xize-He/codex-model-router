@@ -131,6 +131,15 @@ test('routing choices are validated and persisted as local overrides', () => {
   assert.equal(e.publicState().config.routeGuidance.hard, '需要多步验证的困难问题');
   const resized = JSON.parse(readFileSync(path.join(e.root, 'router.config.local.json'), 'utf8'));
   assert.deepEqual(resized.routeOrder, ['simple', 'hard']);
+  e.models = [];
+  e.updateRoutingConfig({ routeOrder: ['hard', 'simple'] });
+  assert.deepEqual(Object.keys(e.config.routes), ['hard', 'simple']);
+  assert.deepEqual(Object.keys(e.config.routeLabels), ['hard', 'simple']);
+  const reordered = JSON.parse(readFileSync(path.join(e.root, 'router.config.local.json'), 'utf8'));
+  assert.deepEqual(reordered.routeOrder, ['hard', 'simple']);
+  assert.throws(() => e.updateRoutingConfig({ routeOrder: ['hard', 'hard'] }), /顺序无效/);
+  assert.throws(() => e.updateRoutingConfig({ routeOrder: ['hard'] }), /顺序无效/);
+  e.models = models;
   assert.throws(() => e.updateRoutingConfig({ tiers: [{ level: 'only', label: '唯一', guidance: '不允许只有一档', model: 'small', effort: 'low' }] }), /2 到 12/);
   assert.throws(() => e.updateRoutingConfig({ tiers: [
     { level: 'constructor', label: '危险', guidance: '无效标识', model: 'small', effort: 'low' },

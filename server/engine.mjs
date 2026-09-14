@@ -295,6 +295,18 @@ export class Engine extends EventEmitter {
         changed = true;
       }
     }
+    if (input.routeOrder !== undefined) {
+      if (!Array.isArray(input.routeOrder)) throw new Error('档位顺序无效');
+      const order = input.routeOrder.map(level => String(level));
+      const levels = Object.keys(next.routes);
+      if (order.length !== levels.length || new Set(order).size !== levels.length || order.some(level => !Object.prototype.hasOwnProperty.call(next.routes, level))) {
+        throw new Error('档位顺序无效');
+      }
+      next.routes = Object.fromEntries(order.map(level => [level, next.routes[level]]));
+      next.routeLabels = Object.fromEntries(order.map(level => [level, next.routeLabels[level]]));
+      next.routeGuidance = Object.fromEntries(order.map(level => [level, next.routeGuidance[level]]));
+      changed = true;
+    }
     if (input.tiers !== undefined) {
       if (!Array.isArray(input.tiers) || input.tiers.length < 2 || input.tiers.length > 12) throw new Error('自动路由需要 2 到 12 个档位');
       const routes = {}, routeLabels = {}, routeGuidance = {}, seen = new Set(), reserved = new Set(['__proto__', 'prototype', 'constructor']);

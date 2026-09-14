@@ -1229,12 +1229,31 @@ a,
 
 .routing-tier-list { display: grid; gap: 6px; margin-top: 8px; }
 .routing-tier-card {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface-subtle);
   color: var(--text-body);
+  transition: border-color 140ms ease, opacity 140ms ease;
 }
+
+.routing-tier-card.dragging { opacity: .42; }
+.routing-tier-card.drop-before::before,
+.routing-tier-card.drop-after::after {
+  position: absolute;
+  z-index: 3;
+  right: 6px;
+  left: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--text-strong);
+  content: '';
+  pointer-events: none;
+}
+
+.routing-tier-card.drop-before::before { top: 0; }
+.routing-tier-card.drop-after::after { bottom: 0; }
 
 .routing-tier-card > summary {
   display: flex;
@@ -1248,6 +1267,26 @@ a,
 
 .routing-tier-card > summary::-webkit-details-marker { display: none; }
 .routing-tier-card > summary:hover { background: var(--surface-hover); }
+.routing-tier-drag {
+  display: grid;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+}
+
+.routing-tier-drag:hover {
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+.routing-tier-drag:active { cursor: grabbing; }
 .routing-tier-index {
   display: grid;
   flex: 0 0 24px;
