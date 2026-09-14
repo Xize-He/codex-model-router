@@ -22,7 +22,6 @@ import {
   Check,
   X,
   Cable,
-  Cpu,
   ArrowRight,
   RefreshCw,
   Gauge,
@@ -62,6 +61,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -230,13 +230,12 @@ type AccountState = {
 };
 
 type PanelSide = 'left' | 'right';
-type InspectorSectionKey = 'usage' | 'mcp' | 'routing' | 'workspace';
+type InspectorSectionKey = 'usage' | 'mcp' | 'workspace';
 type InspectorSections = Record<InspectorSectionKey, boolean>;
 
 const CLOSED_INSPECTOR_SECTIONS: InspectorSections = {
   usage: false,
   mcp: false,
-  routing: false,
   workspace: false,
 };
 
@@ -623,6 +622,8 @@ export default function Home() {
     [accountMenu, setAccountMenu] = useState(false),
     [accountBusy, setAccountBusy] = useState(''),
     [routingBusy, setRoutingBusy] = useState(''),
+    [routingOpen, setRoutingOpen] = useState(false),
+    [routingError, setRoutingError] = useState(''),
     [routeLabelDrafts, setRouteLabelDrafts] = useState<Record<string, string>>({}),
     [draggedTier, setDraggedTier] = useState(''),
     [dragTarget, setDragTarget] = useState<{ level: string; position: 'before' | 'after' } | null>(null),
@@ -708,6 +709,8 @@ export default function Home() {
     fileInput = useRef<HTMLInputElement>(null),
     composerInput = useRef<HTMLTextAreaElement>(null),
     historySearchInput = useRef<HTMLInputElement>(null),
+    routingButtonRef = useRef<HTMLButtonElement>(null),
+    routingDialogRef = useRef<HTMLDivElement>(null),
     accountMenuRef = useRef<HTMLDivElement>(null),
     conversationRef = useRef<HTMLDivElement>(null),
     workbenchRef = useRef<HTMLDivElement>(null),
@@ -1066,12 +1069,14 @@ export default function Home() {
   ): Promise<boolean> {
     try {
       setError('');
+      setRoutingError('');
       setRoutingBusy(key);
       const result = await post<{ ok: boolean; config: State['config'] }>('config/routing', input);
       setState((current) => current ? { ...current, config: result.config } : current);
       return true;
     } catch (e) {
       setError((e as Error).message);
+      setRoutingError((e as Error).message);
       return false;
     } finally {
       setRoutingBusy('');
@@ -1459,6 +1464,19 @@ export default function Home() {
           >
             <SquarePen size={17} />
             新对话
+          </Button>
+          <Button
+            ref={routingButtonRef}
+            variant="ghost"
+            className="routing-settings-button"
+            aria-label="模型路由配置"
+            title="模型路由配置"
+            aria-haspopup="dialog"
+            onClick={() => { setRoutingError(''); setRoutingOpen(true); }}
+            disabled={!state}
+          >
+            <SlidersHorizontal size={17} />
+            <span>模型路由配置</span>
           </Button>
         </div>
         <div className="sidebar-label">
@@ -2604,24 +2622,46 @@ export default function Home() {
               </div>
             </details>
           </section>
+
           <section>
             <details
-              className="inspector-details routing-details"
-              open={inspectorSections.routing}
-              onToggle={(event) => rememberInspectorSection('routing', event.currentTarget.open)}
+              className="inspector-details"
+              open={inspectorSections.workspace}
+              onToggle={(event) => rememberInspectorSection('workspace', event.currentTarget.open)}
             >
               <summary className="inspector-section-summary">
                 <span className="inspector-section-title">
-                  <Cpu size={17} />
-                  模型与自动分流
+                  <Clock3 size={17} />
+                  任务文件目录
                 </span>
                 <ChevronRight className="inspector-section-chevron" size={14} />
               </summary>
-              <div className="routing-details-content">
+              <div className="inspector-section-content">
+                <code>{session?.cwd || state?.cwd}</code>
                 <p>
-                  手动模式可选择账号当前返回的全部 {state?.models.length || 0}{' '}
-                  个模型及其推理强度。自动模式按任务难度使用下面 {routingTiers.length} 档。
+                  继续原生会话时沿用它记录的工作目录；新对话使用工作台 workspace。
                 </p>
+              </div>
+            </details>
+          </section>
+        </aside>
+      )}
+      <Dialog open={routingOpen} onOpenChange={(open) => {
+        if (!open && routingDialogRef.current?.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        setRoutingOpen(open);
+      }}>
+        <DialogContent className="routing-settings-dialog" ref={routingDialogRef} finalFocus={routingButtonRef}>
+          <DialogHeader className="routing-settings-header">
+            <DialogTitle>模型路由配置</DialogTitle>
+            <DialogDescription>管理判断模型、各档位的执行模型和升级规则。点击输入框外自动保存。</DialogDescription>
+            {state?.activeId && <p className="routing-settings-notice">任务运行中，配置暂不可修改。</p>}
+            {routingBusy && <output className="routing-settings-notice">正在保存…</output>}
+            {routingError && <p className="inline-error" role="alert">{routingError}</p>}
+          </DialogHeader>
+              <div className="routing-details-content">
+
                 {state?.config.classifier && classifierEffort && (
                   <div className="routing-config-row classifier-row">
                     <span>判断模型</span>
@@ -2799,31 +2839,8 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-            </details>
-          </section>
-          <section>
-            <details
-              className="inspector-details"
-              open={inspectorSections.workspace}
-              onToggle={(event) => rememberInspectorSection('workspace', event.currentTarget.open)}
-            >
-              <summary className="inspector-section-summary">
-                <span className="inspector-section-title">
-                  <Clock3 size={17} />
-                  任务文件目录
-                </span>
-                <ChevronRight className="inspector-section-chevron" size={14} />
-              </summary>
-              <div className="inspector-section-content">
-                <code>{session?.cwd || state?.cwd}</code>
-                <p>
-                  继续原生会话时沿用它记录的工作目录；新对话使用工作台 workspace。
-                </p>
-              </div>
-            </details>
-          </section>
-        </aside>
-      )}
+        </DialogContent>
+      </Dialog>
       <AlertDialog
         open={!!renameTarget}
         onOpenChange={(open) => {

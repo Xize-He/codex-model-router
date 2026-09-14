@@ -1415,3 +1415,72 @@ a,
 .route-escalation { margin-top: 12px; color: var(--text-body); }
 .route-escalation > span { color: var(--text-secondary); }
 .route-escalation ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.65; }
+
+.sidebar-primary-actions .routing-settings-button {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.sidebar-primary-actions .routing-settings-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+.routing-settings-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(860px, calc(100vw - 32px));
+  max-width: min(860px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text-body);
+  box-shadow: 0 24px 80px var(--shadow-color);
+}
+.routing-settings-header {
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 24px 54px 20px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.routing-settings-header [data-slot='dialog-title'] { color: var(--text-strong); font-size: 22px; line-height: 1.35; font-weight: 650; }
+.routing-settings-header [data-slot='dialog-description'],
+.routing-settings-notice { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.routing-settings-dialog .routing-details-content { min-height: 0; padding: 22px 24px 24px; overflow-y: auto; overscroll-behavior: contain; }
+.routing-settings-dialog .routing-details-content > p { margin: 14px 0; color: var(--text-secondary); font-size: 14px; line-height: 1.65; }
+.routing-settings-dialog .classifier-row { padding-bottom: 18px; font-size: 16px; }
+.routing-settings-dialog .routing-config-trigger { height: 38px; min-height: 38px; max-width: 330px; padding: 8px 10px; font-size: 14px; }
+.routing-settings-dialog .routing-tier-card > summary .routing-config-trigger { flex-basis: 290px; max-width: 48%; }
+.routing-settings-dialog .routing-tier-list { gap: 10px; }
+.routing-settings-dialog .routing-tier-card > summary { min-height: 62px; gap: 10px; padding: 10px 14px; }
+.routing-settings-dialog .routing-tier-summary strong { font-size: 16px; }
+.routing-settings-dialog .routing-tier-index { font-size: 12px; }
+.routing-settings-dialog .routing-tier-editor { gap: 18px; padding: 20px; }
+.routing-settings-dialog .routing-tier-editor label { gap: 8px; }
+.routing-settings-dialog .routing-tier-editor label > span { color: var(--text-secondary); font-size: 14px; }
+.routing-settings-dialog .routing-tier-editor :is(input, textarea) { padding: 10px 12px; font-size: 16px; line-height: 1.65; }
+.routing-settings-dialog .routing-tier-editor textarea { min-height: 132px; }
+.routing-settings-dialog .routing-tier-add { min-height: 44px; font-size: 14px; }
+.routing-config-content .composer-select-item { min-height: 38px; font-size: 14px; }
+.routing-config-content [data-slot='select-label'] { font-size: 13px; }
+@media (max-width: 700px) {
+  .sidebar-primary-actions .routing-settings-button { justify-content: center; padding: 0; }
+  .sidebar-primary-actions .routing-settings-button > span { display: none; }
+}
+@media (max-width: 600px) {
+  .routing-settings-dialog { width: calc(100vw - 16px); max-width: calc(100vw - 16px); max-height: calc(100dvh - 24px); }
+  .routing-settings-header { padding: 18px 48px 16px 16px; }
+  .routing-settings-dialog .routing-details-content { padding: 16px 12px; }
+  .routing-settings-dialog .routing-tier-card > summary { gap: 6px; padding: 8px; }
+  .routing-settings-dialog .routing-tier-summary strong { font-size: 14px; }
+  .routing-settings-dialog .routing-tier-editor { padding: 14px; }
+}
