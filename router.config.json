@@ -4,33 +4,24 @@
   "classifier": "gpt-5.6-sol",
   "classifierEffort": "medium",
   "routeLabels": {
-    "instant": "极速任务",
-    "light": "轻量任务",
-    "focused": "小型开发",
-    "standard": "常规开发",
-    "agentic": "多步执行",
-    "advanced": "困难任务",
-    "expert": "专家任务",
-    "extreme": "极难任务"
+    "l0": "L0 · 机械任务",
+    "l1": "L1 · 常规工程",
+    "l2": "L2 · 复杂工程",
+    "l3": "L3 · 系统推理",
+    "l4": "L4 · 关键任务"
   },
   "routeGuidance": {
-    "instant": "单一、明确、低风险的短问答、翻译、改写或格式整理，不需要工具或只需一次简单读取",
-    "light": "简单分析、单文件读取、简短总结或少量信息整理，范围清晰且不需要修改代码",
-    "focused": "目标明确的单文件修改、小型脚本或局部修复，步骤较少、风险较低且不需要广泛验证",
-    "standard": "常规功能开发、修复并运行测试或少量跨文件修改，范围清楚但需要稳定的实现与验证",
-    "agentic": "较大范围的跨文件修改、连续工具操作或中等规模实现，需要自主完成多个相互依赖的步骤",
-    "advanced": "困难调试、复杂分析、架构权衡、较长上下文或需求存在较强歧义，需要更强的综合推理",
-    "expert": "架构设计、高风险修改、复杂权衡或高度模糊的端到端任务，错误代价较高",
-    "extreme": "极高难度的大型改造、关键技术决策或深度研究，存在强歧义、广泛影响或很高错误成本"
+    "l0": "FAST / MECHANICAL：几乎不需要推理，用户已明确修改位置和方式。适合改 typo、变量名、常量或 log，格式整理、搜索符号、简单文本问答，以及执行现有 git status/diff/log/pull/push、build/test 命令。重点是执行已知步骤，错误容易发现和恢复；不要仅因命令数量或耗时升档。若执行中发现需定位未知问题或处理语义冲突，再考虑升级。",
+    "l1": "ROUTINE ENGINEERING：需要基本代码理解但范围清晰，通常局限一个模块。适合简单函数、参数检查、error handling、retry/timeout、小脚本、明显的普通 bug、仿照已有实现增加功能、解释单文件、普通 rebase/cherry-pick。例：增加简单 sensor、D-Bus property 或 systemd 配置。复杂异步生命周期、未知竞态根因和跨系统影响应提高档位。",
+    "l2": "COMPLEX ENGINEERING：需要先理解关联文件、调用链或一个子系统，再规划修改和测试。适合完整 feature、多文件重构、中等复杂度调试、接口设计、多个语义冲突、性能分析。例：一个 daemon 内的 sensor stale/timeout/fallback、FSC sensor selection、Redfish→D-Bus→backend 联动。问题仍有可识别边界；发现 kernel/userspace 或多个 daemon 的未知耦合时升级。",
+    "l3": "SYSTEM / DEEP REASONING：先弄清系统如何工作才能决定怎么改。适合架构设计、多个子系统的职责划分、方案权衡、未知层次的故障定位、复杂并发/异步/生命周期问题、大型陌生仓库理解。例：FSC 与多个 service 的解耦、MCTP/PLDM 集成、service→hwmon→kernel→I2C 跨层分析、firmware/host/BMC 交互。涉及这些边界的实质性推理通常至少选此档。",
+    "l4": "MAXIMUM / CRITICAL：仅用于极高不确定性且错误代价很高、L3 难以可靠完成的任务，应少量使用。适合大规模核心架构重设计、多种根因均合理的长期偶发跨 userspace/kernel/firmware/hardware 故障、系统级并发重构、架构级巨大合并，以及高风险 thermal safety/emergency shutdown 或 firmware recovery 方案。需要深入验证假设和权衡；不能仅因描述长、文件多或出现一个报错选最高档。"
   },
   "routes": {
-    "instant": { "model": "gpt-5.6-luna", "effort": "low" },
-    "light": { "model": "gpt-5.6-luna", "effort": "medium" },
-    "focused": { "model": "gpt-5.6-terra", "effort": "low" },
-    "standard": { "model": "gpt-5.6-sol", "effort": "medium" },
-    "agentic": { "model": "gpt-5.6-sol", "effort": "high" },
-    "advanced": { "model": "gpt-6-astra", "effort": "medium" },
-    "expert": { "model": "gpt-6-astra", "effort": "high" },
-    "extreme": { "model": "gpt-6-astra", "effort": "xhigh" }
+    "l0": { "model": "gpt-5.6-luna", "effort": "low" },
+    "l1": { "model": "gpt-5.6-terra", "effort": "medium" },
+    "l2": { "model": "gpt-5.6-sol", "effort": "medium" },
+    "l3": { "model": "gpt-6-astra", "effort": "high" },
+    "l4": { "model": "gpt-6-astra", "effort": "xhigh" }
   }
 }

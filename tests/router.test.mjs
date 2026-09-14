@@ -146,19 +146,24 @@ test('routing choices are validated and persisted as local overrides', () => {
     { level: 'safe', label: '安全', guidance: '有效标识', model: 'small', effort: 'low' },
   ] }), /标识无效/);
 });
-test('default automatic routing uses the agreed eight model and effort profiles', () => {
+test('default automatic routing uses the agreed L0-L4 model and effort profiles', () => {
   assert.equal(routerConfig.classifier, 'gpt-5.6-sol');
   assert.equal(routerConfig.classifierEffort, 'medium');
   assert.deepEqual(routerConfig.routes, {
-    instant: { model: 'gpt-5.6-luna', effort: 'low' },
-    light: { model: 'gpt-5.6-luna', effort: 'medium' },
-    focused: { model: 'gpt-5.6-terra', effort: 'low' },
-    standard: { model: 'gpt-5.6-sol', effort: 'medium' },
-    agentic: { model: 'gpt-5.6-sol', effort: 'high' },
-    advanced: { model: 'gpt-6-astra', effort: 'medium' },
-    expert: { model: 'gpt-6-astra', effort: 'high' },
-    extreme: { model: 'gpt-6-astra', effort: 'xhigh' },
+    l0: { model: 'gpt-5.6-luna', effort: 'low' },
+    l1: { model: 'gpt-5.6-terra', effort: 'medium' },
+    l2: { model: 'gpt-5.6-sol', effort: 'medium' },
+    l3: { model: 'gpt-6-astra', effort: 'high' },
+    l4: { model: 'gpt-6-astra', effort: 'xhigh' },
   });
+  assert.deepEqual(Object.keys(routerConfig.routes), ['l0', 'l1', 'l2', 'l3', 'l4']);
+  const e = engine(); e.models = Object.values(routerConfig.routes).map(route => ({ model: route.model, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'].map(reasoningEffort => ({ reasoningEffort })) }));
+  e.updateRoutingConfig({ tiers: Object.entries(routerConfig.routes).map(([level, binding]) => ({ level, ...binding, label: routerConfig.routeLabels[level], guidance: routerConfig.routeGuidance[level] })) });
+  writeFileSync(path.join(e.root, 'router.config.json'), JSON.stringify(routerConfig));
+  const loaded = loadRouterConfig(e.root);
+  assert.deepEqual(loaded.routes, routerConfig.routes);
+  assert.deepEqual(loaded.routeLabels, routerConfig.routeLabels);
+  assert.deepEqual(loaded.routeGuidance, routerConfig.routeGuidance);
 });
 test('native turns and multi-window account limits are normalized for the UI', () => {
   const task = mapNativeTurn({ id: 'turn', status: 'completed', startedAt: 10, completedAt: 12, error: null, items: [

@@ -32,16 +32,13 @@ MCP 服务由使用者自行启动，和网页分别管理。关闭浏览器或 
 - MCP：公开配置默认不连接任何服务。复制 `router.config.local.example.json` 为 `router.config.local.json`，在 `mcpServers` 中配置任意数量的服务。该本机文件已被 Git 忽略。
 - MCP 认证：每个服务可指定自己的 `tokenEnv`。启动脚本也支持当前 Windows 用户加密的多服务认证缓存，不在网页或源码中保存明文密钥。
 - 判断难度：`gpt-5.6-sol`，medium。该模型使用 Codex 主额度，适合判断模糊、多步骤及需要权衡的任务。
-- 极速任务：`gpt-5.6-luna` / low。
-- 轻量任务：`gpt-5.6-luna` / medium。
-- 小型开发：`gpt-5.6-terra` / low。
-- 常规开发：`gpt-5.6-sol` / medium。
-- 多步执行：`gpt-5.6-sol` / high。
-- 困难任务：`gpt-6-astra` / medium。
-- 专家任务：`gpt-6-astra` / high。
-- 极难任务：`gpt-6-astra` / xhigh。
+- L0 · 机械任务：`gpt-5.6-luna` / low。
+- L1 · 常规工程：`gpt-5.6-terra` / medium。
+- L2 · 复杂工程：`gpt-5.6-sol` / medium。
+- L3 · 系统推理：`gpt-6-astra` / high。
+- L4 · 关键任务：`gpt-6-astra` / xhigh。
 
-八档只是默认的自动分流策略，不是模型数量限制。可以在右侧“模型与自动分流”中把档位数量调整为 2～12 档，编辑每档名称和判断描述、拖拽排序，并选择执行模型与推理强度；结果写入 Git 忽略的 `router.config.local.json`，重启后继续生效。也可以直接修改 `router.config.json` 的公开默认值。档位应按能力从低到高排列，绑定模型的能力顺序由配置者决定。手动模式通过 Codex `model/list` 实时读取账号里的全部可见模型及其推理强度；指定模型不存在或强度不受支持时会明确报错。
+L0–L4 是默认的五档策略，不是模型数量限制。可以在右侧“模型与自动分流”中把档位数量调整为 2～12 档，编辑每档名称和判断描述、拖拽排序，并选择执行模型与推理强度；结果写入 Git 忽略的 `router.config.local.json`，重启后继续生效。也可以直接修改 `router.config.json` 的公开默认值。本地已保存的自定义档位仍优先于公开默认值。档位应按能力从低到高排列，绑定模型的能力顺序由配置者决定。手动模式通过 Codex `model/list` 实时读取账号里的全部可见模型及其推理强度；指定模型不存在或强度不受支持时会明确报错。
 
 分类与模型映射分开：分类器只接收档位 ID、顺序、名称、描述，以及最近四轮的截断上下文、当前问题和附件元信息，不接收绑定的模型名称、强度或模型目录。`routeLabels` / `routeGuidance` 定义档位含义，`routes` 定义执行模型映射；换模型只需修改映射。分类结果包含 `level`、`reason`、`confidence`、`taskType` 和 `escalation`（更高目标档位及可观察的触发条件，或 `null`）。信心值是模型估计，不是校准后的准确率。自动分类会产生额外模型用量，不保证每次都比手动选择节省。
 
