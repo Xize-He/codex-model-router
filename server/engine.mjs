@@ -275,21 +275,25 @@ export class Engine extends EventEmitter {
     if (input.level !== undefined) {
       const level = String(input.level);
       if (!Object.prototype.hasOwnProperty.call(next.routes, level)) throw new Error('路由档位无效');
-      const model = String(input.model || '');
-      const effort = String(input.effort || '');
-      validate(model, effort);
-      next.routes[level] = { model, effort };
+      if (input.model !== undefined || input.effort !== undefined) {
+        const model = String(input.model || next.routes[level].model || '');
+        const effort = String(input.effort || next.routes[level].effort || '');
+        validate(model, effort);
+        next.routes[level] = { model, effort };
+        changed = true;
+      }
       if (input.label !== undefined) {
         const label = cleanRouteLabel(input.label);
         if (!label) throw new Error('档位名称不能为空');
         next.routeLabels[level] = label;
+        changed = true;
       }
       if (input.guidance !== undefined) {
         const guidance = cleanRouteGuidance(input.guidance);
         if (!guidance) throw new Error('档位描述不能为空');
         next.routeGuidance[level] = guidance;
+        changed = true;
       }
-      changed = true;
     }
     if (input.tiers !== undefined) {
       if (!Array.isArray(input.tiers) || input.tiers.length < 2 || input.tiers.length > 12) throw new Error('自动路由需要 2 到 12 个档位');

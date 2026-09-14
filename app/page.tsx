@@ -610,6 +610,7 @@ export default function Home() {
     [accountMenu, setAccountMenu] = useState(false),
     [accountBusy, setAccountBusy] = useState(''),
     [routingBusy, setRoutingBusy] = useState(''),
+    [routeLabelDrafts, setRouteLabelDrafts] = useState<Record<string, string>>({}),
     [apiKey, setApiKey] = useState(''),
     [activeTurnIndex, setActiveTurnIndex] = useState(0),
     [hoveredTurnIndex, setHoveredTurnIndex] = useState<number | null>(null),
@@ -1044,24 +1045,25 @@ export default function Home() {
       guidance?: string;
       tiers?: RouteTier[];
     },
-  ) {
+  ): Promise<boolean> {
     try {
       setError('');
       setRoutingBusy(key);
-      await post('config/routing', input);
+      const result = await post<{ ok: boolean; config: State['config'] }>('config/routing', input);
+      setState((current) => current ? { ...current, config: result.config } : current);
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       setRoutingBusy('');
     }
   }
-  function saveRouteText(tier: RouteTier, field: 'label' | 'guidance', value: string) {
+  async function saveRouteText(tier: RouteTier, field: 'label' | 'guidance', value: string) {
     const normalized = value.trim();
-    if (!normalized || normalized === tier[field]) return;
-    void updateRoutingConfig(`${tier.level}:${field}`, {
+    if (!normalized || normalized === tier[field]) return true;
+    return updateRoutingConfig(`${tier.level}:${field}`, {
       level: tier.level,
-      model: tier.model,
-      effort: tier.effort,
       [field]: normalized,
     });
   }
@@ -2599,12 +2601,14 @@ export default function Home() {
                   模型目录中的官方简介、支持的推理强度，以及每个档位的自定义描述。
                 </p>
                 <div className="routing-tier-list">
-                  {routingTiers.map((tier, index) => (
+                  {routingTiers.map((tier, index) => {
+                    const visibleLabel = routeLabelDrafts[tier.level] ?? tier.label;
+                    return (
                     <details className="routing-tier-card" key={tier.level}>
                       <summary>
                         <span className="routing-tier-index">{index + 1}</span>
                         <span className="routing-tier-summary">
-                          <strong>{tier.label}</strong>
+                          <strong>{visibleLabel}</strong>
                           <small>{shortModel(tier.model)} · {tier.effort}</small>
                         </span>
                         <ChevronRight className="routing-tier-chevron" size={14} />
@@ -2617,9 +2621,25 @@ export default function Home() {
                             defaultValue={tier.label}
                             maxLength={30}
                             disabled={!!state?.activeId || !!routingBusy}
-                            onBlur={(event) => {
-                              if (!event.currentTarget.value.trim()) event.currentTarget.value = tier.label;
-                              else saveRouteText(tier, 'label', event.currentTarget.value);
+                            onChange={(event) => {
+                              const nextLabel = event.currentTarget.value;
+                              setRouteLabelDrafts((current) => ({
+                                ...current,
+                                [tier.level]: nextLabel,
+                              }));
+                            }}
+                            onBlur={async (event) => {
+                              const input = event.currentTarget;
+                              const nextLabel = input.value.trim();
+                              const saved = nextLabel
+                                ? await saveRouteText(tier, 'label', nextLabel)
+                                : false;
+                              if (!saved) input.value = tier.label;
+                              setRouteLabelDrafts((current) => {
+                                const next = { ...current };
+                                delete next[tier.level];
+                                return next;
+                              });
                             }}
                           />
                         </label>
@@ -2633,7 +2653,7 @@ export default function Home() {
                             disabled={!!state?.activeId || !!routingBusy}
                             onBlur={(event) => {
                               if (!event.currentTarget.value.trim()) event.currentTarget.value = tier.guidance;
-                              else saveRouteText(tier, 'guidance', event.currentTarget.value);
+                              else void saveRouteText(tier, 'guidance', event.currentTarget.value);
                             }}
                           />
                         </label>
@@ -2643,7 +2663,7 @@ export default function Home() {
                             models={state?.models || []}
                             model={tier.model}
                             effort={tier.effort}
-                            label={`选择${tier.label}使用的模型和推理强度`}
+                            label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
                             disabled={!!state?.activeId || !!routingBusy}
                             onChange={(nextModel, nextEffort) => void updateRoutingConfig(tier.level, {
                               level: tier.level,
@@ -2655,7 +2675,7 @@ export default function Home() {
                         <div className="routing-tier-actions">
                           <button
                             type="button"
-                            aria-label={`上移${tier.label}`}
+                            aria-label={`上移${visibleLabel || tier.label}`}
                             disabled={index === 0 || !!state?.activeId || !!routingBusy}
                             onClick={() => moveRoutingTier(index, -1)}
                           >
@@ -2663,7 +2683,7 @@ export default function Home() {
                           </button>
                           <button
                             type="button"
-                            aria-label={`下移${tier.label}`}
+                            aria-label={`下移${visibleLabel || tier.label}`}
                             disabled={index === routingTiers.length - 1 || !!state?.activeId || !!routingBusy}
                             onClick={() => moveRoutingTier(index, 1)}
                           >
@@ -2672,7 +2692,7 @@ export default function Home() {
                           <button
                             type="button"
                             className="danger"
-                            aria-label={`删除${tier.label}`}
+                            aria-label={`删除${visibleLabel || tier.label}`}
                             disabled={routingTiers.length <= 2 || !!state?.activeId || !!routingBusy}
                             onClick={() => removeRoutingTier(index)}
                           >
@@ -2681,7 +2701,8 @@ export default function Home() {
                         </div>
                       </div>
                     </details>
-                  ))}
+                    );
+                  })}
                   <button
                     type="button"
                     className="routing-tier-add"

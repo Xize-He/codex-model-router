@@ -118,6 +118,10 @@ test('routing choices are validated and persisted as local overrides', () => {
   assert.deepEqual(saved.routes.light, { model: 'big', effort: 'medium' });
   assert.throws(() => e.updateRoutingConfig({ level: 'missing', model: 'big', effort: 'medium' }), /档位无效/);
   assert.throws(() => e.updateRoutingConfig({ level: 'light', model: 'small', effort: 'high' }), /不支持/);
+  e.models = [];
+  e.updateRoutingConfig({ level: 'light', label: '离线也可改名' });
+  assert.equal(e.publicState().config.routeLabels.light, '离线也可改名');
+  e.models = models;
   e.updateRoutingConfig({ tiers: [
     { level: 'simple', label: '简单', guidance: '无需工具的简单问题', model: 'small', effort: 'low' },
     { level: 'hard', label: '困难', guidance: '需要多步验证的困难问题', model: 'big', effort: 'high' },
