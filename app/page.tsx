@@ -120,6 +120,13 @@ type Task = {
   files?: ChangedFile[];
   id: string;
   turnId?: string;
+  turnIds?: string[];
+  escalationAvailable?: boolean;
+  routeHistory?: {
+    from: { level: string; model: string; effort: string; reason: string; confidence?: number };
+    to: { level: string; model: string; effort: string };
+    reason: string; evidence: string[]; at: number;
+  }[];
   native?: boolean;
   prompt: string;
   attachments?: Attachment[];
@@ -130,6 +137,9 @@ type Task = {
     reason: string;
     level: string;
     classifier: string | null;
+    confidence?: number;
+    taskType?: string;
+    escalation?: { targetLevel: string; signals: string[] } | null;
   } | null;
   messages: { id: string; text: string }[];
   events: { label: string; at: number; kind?: string }[];
@@ -305,6 +315,7 @@ type State = {
 };
 const statusText: Record<string, string> = {
   classifying: '正在判断难度',
+  escalating: '正在交接升档',
   starting: '正在准备',
   running: '执行中',
   waiting: '等待你的操作',
@@ -2062,6 +2073,25 @@ export default function Home() {
                             {state?.config.routeLabels?.[task.route.level] || levelText[task.route.level] || task.route.level}
                           </span>
                           <p>{task.route.reason}</p>
+                          {task.route.confidence !== undefined && (
+                            <p className="route-meta">{task.route.taskType ? `${task.route.taskType} · ` : ''}初始判断信心 {task.route.confidence}%（模型估计）</p>
+                          )}
+                          {!!task.route.escalation && !task.routeHistory?.length && (
+                            <div className="route-escalation">
+                              <span>升级条件 · {state?.config.routeLabels?.[task.route.escalation.targetLevel] || task.route.escalation.targetLevel}</span>
+                              <ul>{task.route.escalation.signals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
+                            </div>
+                          )}
+                          {task.routeHistory?.map((transition, index) => (
+                            <div className="route-escalation" key={index}>
+                              <span>已自动升档 · {shortModel(transition.from.model)} · {transition.from.effort} → {shortModel(transition.to.model)} · {transition.to.effort}</span>
+                              <p>初始判断：{transition.from.reason}</p>
+                              <ul>{transition.evidence.map((evidence, itemIndex) => <li key={itemIndex}>{evidence}</li>)}</ul>
+                            </div>
+                          ))}
+                          {task.escalationAvailable === false && task.route.classifier && (
+                            <p className="route-meta">此旧会话支持初始分流；新建会话可启用执行中升档。</p>
+                          )}
                         </div>
                       </details>
                     ) : task.status === 'classifying' ? (
@@ -2603,8 +2633,8 @@ export default function Home() {
                   </div>
                 )}
                 <p>
-                  判断依据：实时 Codex
-                  模型目录中的官方简介、支持的推理强度，以及每个档位的自定义描述。
+                  分类器按档位名称、描述和上下文判断复杂度，模型与强度由下方映射决定。
+                  请按能力由低到高排列。新建会话在 Auto 模式下可根据执行中发现的复杂度自动升档，每个任务最多一次。
                 </p>
                 <div className="routing-tier-list">
                   {routingTiers.map((tier, index) => {

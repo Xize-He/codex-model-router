@@ -1420,3 +1420,7 @@ a,
 }
 
 .routing-tier-add:disabled { opacity: .35; }
+.route-reason .route-meta { color: var(--text-secondary); }
+.route-escalation { margin-top: 12px; color: var(--text-body); }
+.route-escalation > span { color: var(--text-secondary); }
+.route-escalation ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.65; }
