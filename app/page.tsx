@@ -203,6 +203,7 @@ type RouteTier = {
   level: string;
   label: string;
   guidance: string;
+  escalationGuidance: string;
   model: string;
   effort: string;
 };
@@ -311,6 +312,7 @@ type State = {
     routes: Record<string, { model: string; effort: string }>;
     routeLabels?: Record<string, string>;
     routeGuidance?: Record<string, string>;
+    routeEscalationGuidance?: Record<string, string>;
   };
 };
 const statusText: Record<string, string> = {
@@ -815,6 +817,7 @@ export default function Home() {
     level,
     label: state?.config.routeLabels?.[level] || levelText[level] || level,
     guidance: state?.config.routeGuidance?.[level] || '',
+    escalationGuidance: state?.config.routeEscalationGuidance?.[level] || '',
     model: route.model,
     effort: route.effort,
   }));
@@ -1055,6 +1058,7 @@ export default function Home() {
       effort?: string;
       label?: string;
       guidance?: string;
+      escalationGuidance?: string;
       tiers?: RouteTier[];
       routeOrder?: string[];
     },
@@ -1072,9 +1076,9 @@ export default function Home() {
       setRoutingBusy('');
     }
   }
-  async function saveRouteText(tier: RouteTier, field: 'label' | 'guidance', value: string) {
+  async function saveRouteText(tier: RouteTier, field: 'label' | 'guidance' | 'escalationGuidance', value: string) {
     const normalized = value.trim();
-    if (!normalized || normalized === tier[field]) return true;
+    if ((!normalized && field !== 'escalationGuidance') || normalized === tier[field]) return true;
     return updateRoutingConfig(`${tier.level}:${field}`, {
       level: tier.level,
       [field]: normalized,
@@ -1109,6 +1113,7 @@ export default function Home() {
       {
         level,
         label: `自定义任务 ${routingTiers.length + 1}`,
+        escalationGuidance: '',
         guidance: previous
           ? `比“${previous.label}”更复杂、影响范围更广或错误成本更高的任务`
           : '根据任务复杂度、工具步骤、影响范围和错误成本选择该档位',
@@ -2737,6 +2742,22 @@ export default function Home() {
                             onBlur={(event) => {
                               if (!event.currentTarget.value.trim()) event.currentTarget.value = tier.guidance;
                               else void saveRouteText(tier, 'guidance', event.currentTarget.value);
+                            }}
+                          />
+                        </label>
+                        <label>
+                          <span>升级判断规则</span>
+                          <textarea
+                            key={`escalation-${tier.level}-${tier.escalationGuidance}`}
+                            defaultValue={tier.escalationGuidance}
+                            maxLength={600}
+                            rows={3}
+                            placeholder="哪些新发现需要升档？留空则由模型按任务判断。"
+                            disabled={!!state?.activeId || !!routingBusy}
+                            onBlur={async (event) => {
+                              const input = event.currentTarget;
+                              const saved = await saveRouteText(tier, 'escalationGuidance', input.value);
+                              if (!saved) input.value = tier.escalationGuidance;
                             }}
                           />
                         </label>

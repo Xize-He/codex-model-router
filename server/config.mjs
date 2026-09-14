@@ -47,6 +47,7 @@ export function loadRouterConfig(root) {
     routes,
     routeLabels: { ...base.routeLabels, ...local.routeLabels },
     routeGuidance: { ...base.routeGuidance, ...local.routeGuidance },
+    routeEscalationGuidance: { ...base.routeEscalationGuidance, ...local.routeEscalationGuidance },
   };
   merged.mcpServers = normalizeMcpServers(merged);
   delete merged.mcpUrl;
@@ -65,6 +66,7 @@ export function saveRoutingConfig(root, config) {
     routeOrder: Object.keys(config.routes || {}),
     routeLabels: config.routeLabels || {},
     routeGuidance: config.routeGuidance || {},
+    routeEscalationGuidance: config.routeEscalationGuidance || {},
   };
   const tempPath = `${localPath}.tmp`;
   writeFileSync(tempPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');

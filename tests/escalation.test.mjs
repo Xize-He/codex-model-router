@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createPatch } from 'diff';
 import { Engine, buildRouteCatalog } from '../server/engine.mjs';
+import { loadRouterConfig } from '../server/config.mjs';
 import { ESCALATION_TOOL, classificationTiers, parseClassification } from '../server/routing.mjs';
 
 const config = {
@@ -11,6 +12,7 @@ const config = {
   routes: { basic: { model: 'worker', effort: 'low' }, complex: { model: 'expert', effort: 'medium' }, critical: { model: 'expert', effort: 'high' } },
   routeLabels: { basic: '常规', complex: '复杂', critical: '关键' },
   routeGuidance: { basic: '边界清晰的修改', complex: '跨系统耦合问题', critical: '关键系统决策' },
+  routeEscalationGuidance: { basic: '发现共享协议状态涉及驱动与用户态时升级' },
 };
 const models = ['judge', 'worker', 'expert'].map(model => ({ model, displayName: model, description: 'Private provider catalog text', defaultReasoningEffort: 'medium', supportedReasoningEfforts: ['low', 'medium', 'high'].map(reasoningEffort => ({ reasoningEffort })) }));
 const decision = { level: 'basic', reason: '初始范围清晰', confidence: 82, taskType: '局部修复', escalation: { targetLevel: 'complex', signals: ['发现跨内核与用户态的协议依赖'] } };
@@ -83,6 +85,7 @@ test('upgrade continues the same thread, preserves approvals, combines edits and
     notify('item/completed', { ...base, item });
     notify('item/completed', { ...base, item: { type: 'agentMessage', id: `answer-${n}`, text: n === 1 ? '交接摘要' : '完成修改' } });
     if (n === 1) {
+      assert.match(params.additionalContext['model-router/policy'].value, /发现共享协议状态涉及驱动与用户态时升级/);
       firstTurnId = base.turnId;
       await tool(); assert.equal(e.active.task.route.model, 'worker');
       assert.equal(e.active.task.status, 'escalating');
@@ -172,4 +175,25 @@ test('existing conversations retain initial routing without pretending to retrof
   await finished(f); assert.equal(task.status, 'completed'); assert.equal(f.executionTurns(), 1);
   assert.equal(f.calls[0].method, 'thread/resume');
   assert.equal(Object.hasOwn(f.calls[0].params, 'dynamicTools'), false);
+});
+
+test('editable escalation criteria survive save, reorder, tier replacement, clearing and restart', () => {
+  const { e } = fixture(async () => {});
+  writeFileSync(path.join(e.root, 'router.config.json'), JSON.stringify(config));
+  const rule = '发现当前模块依赖多个状态机时才考虑升级';
+  const result = e.updateRoutingConfig({ level: 'basic', escalationGuidance: rule });
+  assert.equal(result.config.routeEscalationGuidance.basic, rule);
+  assert.equal(e.publicState().config.routeEscalationGuidance.basic, rule);
+  assert.equal(loadRouterConfig(e.root).routeEscalationGuidance.basic, rule);
+  assert.equal(classificationTiers(buildRouteCatalog(e.config, e.models))[0].escalationGuidance, rule);
+  e.updateRoutingConfig({ routeOrder: ['critical', 'basic', 'complex'] });
+  assert.equal(e.config.routeEscalationGuidance.basic, rule);
+  e.updateRoutingConfig({ tiers: buildRouteCatalog(e.config, e.models).filter(tier => tier.level !== 'complex').map(({ escalationGuidance: _escalationGuidance, ...legacyTier }) => legacyTier) });
+  assert.equal(e.config.routeEscalationGuidance.basic, rule, 'older clients replacing tiers preserve omitted criteria');
+  assert.equal(Object.hasOwn(e.config.routeEscalationGuidance, 'complex'), false);
+  assert.throws(() => e.updateRoutingConfig({ level: 'basic', escalationGuidance: null }), /必须是文字/);
+  e.updateRoutingConfig({ level: 'basic', escalationGuidance: '' });
+  const reloaded = new Engine(e.root, loadRouterConfig(e.root));
+  assert.equal(reloaded.config.routeEscalationGuidance.basic, '', 'cleared local criteria must override the default');
+  assert.equal(reloaded.publicState().config.routeEscalationGuidance.basic, '');
 });

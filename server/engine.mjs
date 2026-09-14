@@ -188,6 +188,7 @@ export function buildRouteCatalog(config, models) {
       description: String(model?.description || '').slice(0, 800),
       supportedReasoningEfforts: (model?.supportedReasoningEfforts || []).map(item => item.reasoningEffort),
       guidance: config.routeGuidance?.[level] || defaultRouteGuidance[level] || '',
+      escalationGuidance: config.routeEscalationGuidance?.[level] || '',
       available: Boolean(model),
     };
   });
@@ -239,6 +240,7 @@ export class Engine extends EventEmitter {
       routes: this.config.routes,
       routeLabels: Object.fromEntries(levels.map(level => [level, this.config.routeLabels?.[level] || defaultRouteLabels[level] || level])),
       routeGuidance: Object.fromEntries(levels.map(level => [level, this.config.routeGuidance?.[level] || defaultRouteGuidance[level] || ''])),
+      routeEscalationGuidance: Object.fromEntries(levels.map(level => [level, this.config.routeEscalationGuidance?.[level] || ''])),
     };
     const mcpServers = this.mcpStatuses.map(server => ({ name: server.name || server.configuredName, connected: server.connected, enabled: server.enabled }));
     return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: this.models, config, cwd: this.cwd,
@@ -252,6 +254,7 @@ export class Engine extends EventEmitter {
       routes: Object.fromEntries(Object.entries(this.config.routes || {}).map(([level, route]) => [level, { ...route }])),
       routeLabels: { ...this.config.routeLabels },
       routeGuidance: { ...this.config.routeGuidance },
+      routeEscalationGuidance: { ...this.config.routeEscalationGuidance },
     };
     let changed = false;
     const validate = (modelId, effort) => {
@@ -293,6 +296,11 @@ export class Engine extends EventEmitter {
         next.routeGuidance[level] = guidance;
         changed = true;
       }
+      if (input.escalationGuidance !== undefined) {
+        if (typeof input.escalationGuidance !== 'string') throw new Error('升级判断规则必须是文字');
+        next.routeEscalationGuidance[level] = cleanRouteGuidance(input.escalationGuidance);
+        changed = true;
+      }
     }
     if (input.routeOrder !== undefined) {
       if (!Array.isArray(input.routeOrder)) throw new Error('档位顺序无效');
@@ -304,11 +312,12 @@ export class Engine extends EventEmitter {
       next.routes = Object.fromEntries(order.map(level => [level, next.routes[level]]));
       next.routeLabels = Object.fromEntries(order.map(level => [level, next.routeLabels[level]]));
       next.routeGuidance = Object.fromEntries(order.map(level => [level, next.routeGuidance[level]]));
+      next.routeEscalationGuidance = Object.fromEntries(order.map(level => [level, next.routeEscalationGuidance[level] || '']));
       changed = true;
     }
     if (input.tiers !== undefined) {
       if (!Array.isArray(input.tiers) || input.tiers.length < 2 || input.tiers.length > 12) throw new Error('自动路由需要 2 到 12 个档位');
-      const routes = {}, routeLabels = {}, routeGuidance = {}, seen = new Set(), reserved = new Set(['__proto__', 'prototype', 'constructor']);
+      const routes = {}, routeLabels = {}, routeGuidance = {}, routeEscalationGuidance = {}, seen = new Set(), reserved = new Set(['__proto__', 'prototype', 'constructor']);
       for (const raw of input.tiers) {
         const level = String(raw?.level || '').toLowerCase();
         if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(level) || reserved.has(level) || seen.has(level)) throw new Error('档位标识无效或重复');
@@ -322,17 +331,20 @@ export class Engine extends EventEmitter {
         routes[level] = { model, effort };
         routeLabels[level] = label;
         routeGuidance[level] = guidance;
+        if (raw.escalationGuidance !== undefined && typeof raw.escalationGuidance !== 'string') throw new Error('升级判断规则必须是文字');
+        routeEscalationGuidance[level] = cleanRouteGuidance(raw.escalationGuidance ?? next.routeEscalationGuidance[level] ?? '');
       }
       next.routes = routes;
       next.routeLabels = routeLabels;
       next.routeGuidance = routeGuidance;
+      next.routeEscalationGuidance = routeEscalationGuidance;
       changed = true;
     }
     if (!changed) throw new Error('没有可保存的路由配置');
     saveRoutingConfig(this.root, next);
     this.config = next;
     this.changed();
-    return { ok: true, config: { classifier: next.classifier, classifierEffort: next.classifierEffort, routes: next.routes, routeLabels: next.routeLabels, routeGuidance: next.routeGuidance } };
+    return { ok: true, config: { classifier: next.classifier, classifierEffort: next.classifierEffort, routes: next.routes, routeLabels: next.routeLabels, routeGuidance: next.routeGuidance, routeEscalationGuidance: next.routeEscalationGuidance } };
   }
   changed() { this.emit('change'); }
   save() {
