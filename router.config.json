@@ -1,0 +1,16 @@
+{
+  "port": 7341,
+  "mcpServers": [],
+  "classifier": "gpt-5.6-sol",
+  "classifierEffort": "medium",
+  "routes": {
+    "instant": { "model": "gpt-5.6-luna", "effort": "low" },
+    "light": { "model": "gpt-5.6-luna", "effort": "medium" },
+    "focused": { "model": "gpt-5.6-terra", "effort": "low" },
+    "standard": { "model": "gpt-5.6-sol", "effort": "medium" },
+    "agentic": { "model": "gpt-5.6-sol", "effort": "high" },
+    "advanced": { "model": "gpt-6-astra", "effort": "medium" },
+    "expert": { "model": "gpt-6-astra", "effort": "high" },
+    "extreme": { "model": "gpt-6-astra", "effort": "xhigh" }
+  }
+}

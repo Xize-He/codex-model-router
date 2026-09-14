@@ -1,0 +1,127 @@
+.answer-text { white-space: normal; min-width: 0; }
+.answer-markdown { font-size: 14px; line-height: 1.8; color: #26354a; overflow-wrap: anywhere; white-space: normal; }
+.answer-markdown > :first-child { margin-top: 0; }
+.answer-markdown > :last-child { margin-bottom: 0; }
+.answer-markdown p { margin: 0 0 14px; }
+.answer-markdown h1,.answer-markdown h2,.answer-markdown h3,.answer-markdown h4,.answer-markdown h5,.answer-markdown h6 { display: block; margin: 28px 0 12px; color: #172c48; font-weight: 650; line-height: 1.45; letter-spacing: 0; }
+.answer-markdown h1 { font-size: 22px; } .answer-markdown h2 { font-size: 19px; } .answer-markdown h3 { font-size: 16px; } .answer-markdown h4,.answer-markdown h5,.answer-markdown h6 { font-size: 14px; }
+.answer-markdown ul,.answer-markdown ol { padding-left: 26px; margin: 12px 0 18px; }
+.answer-markdown ul { list-style: disc; } .answer-markdown ol { list-style: decimal; }
+.answer-markdown li { padding-left: 3px; margin: 6px 0; } .answer-markdown li > p { margin-bottom: 6px; } .answer-markdown li > ul,.answer-markdown li > ol { margin: 6px 0; }
+.answer-markdown .contains-task-list { list-style: none; padding-left: 6px; } .answer-markdown input[type=checkbox] { margin-right: 9px; accent-color: #315cdb; }
+.answer-markdown a { color: #275bc1; text-decoration: underline; text-underline-offset: 3px; }
+.answer-markdown blockquote { border-left: 3px solid #99add3; margin: 18px 0; padding: 10px 18px; background: #f5f7fb; color: #5c6e88; border-radius: 0 8px 8px 0; }
+.answer-markdown blockquote p:last-child { margin-bottom: 0; }
+.answer-markdown hr { border: 0; border-top: 1px solid #e1e7f0; margin: 26px 0; }
+.answer-markdown code { display: inline; margin: 0; padding: 2px 5px; border-radius: 4px; background: #e4eaf2; color: #26364b; font: 13px/1.65 Consolas, 'Cascadia Code', monospace; }
+.answer-code { margin: 18px 0; border: 1px solid #b4c2d3; border-radius: 10px; overflow: hidden; background: #dfe6ee; }
+.answer-code-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 14px; background: #cdd7e3; color: #394d68; font: 12px/1.5 Consolas, monospace; border-bottom: 1px solid #b4c2d3; }
+.answer-code pre { margin: 0; padding: 17px; background: #dfe6ee; overflow: auto; max-height: 560px; tab-size: 4; white-space: pre; }
+.answer-code code { padding: 0; background: transparent; color: #26364b; white-space: pre; overflow-wrap: normal; }
+.answer-copy { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 5px; background: transparent; color: #667995; padding: 5px 8px; font: 12px/1.5 'Segoe UI','Microsoft YaHei',sans-serif; }
+.answer-copy:hover { background: #e3eaf5; color: #244fa5; }
+.answer-code-header .answer-copy { color: #3d526e; }
+.answer-code-header .answer-copy:hover { background: #cbd6e5; color: #183c7b; }
+.answer-actions { display: flex; margin: 12px 0 4px; }
+.answer-table { overflow-x: auto; margin: 18px 0; border: 1px solid #dce4ef; border-radius: 9px; }
+.answer-table table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.65; }
+.answer-table th,.answer-table td { padding: 11px 15px; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; min-width: 100px; vertical-align: top; }
+.answer-table th { background: #edf2f8; font-weight: 600; text-align: left; }
+.answer-table tr:last-child td { border-bottom: 0; } .answer-table tr:nth-child(even) td { background: #f8fafd; }
+.answer-table th:last-child,.answer-table td:last-child { border-right: 0; }
+.hljs-keyword,.hljs-selector-tag,.hljs-literal { color: #9051b7; } .hljs-string,.hljs-regexp,.hljs-addition { color: #258053; }
+.hljs-number,.hljs-symbol,.hljs-attr { color: #ae6124; } .hljs-title,.hljs-built_in,.hljs-section { color: #2867b4; }
+.hljs-comment,.hljs-quote { color: #79899b; font-style: italic; } .hljs-deletion { color: #b43d47; }
+@media(max-width: 700px) { .answer-code pre { padding: 12px; } .answer-table th,.answer-table td { padding: 9px 11px; } }
+
+/* Match rich reply elements to the shared application palette. */
+.answer-markdown {
+  color: var(--text-body);
+}
+
+.answer-markdown h1,
+.answer-markdown h2,
+.answer-markdown h3,
+.answer-markdown h4,
+.answer-markdown h5,
+.answer-markdown h6 {
+  color: var(--text-strong);
+}
+
+.answer-markdown a {
+  color: var(--link);
+}
+
+.answer-markdown blockquote {
+  background: var(--surface-subtle);
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+
+.answer-markdown hr {
+  border-color: var(--line);
+}
+
+.answer-markdown code {
+  background: var(--code-surface);
+  color: var(--text-body);
+}
+
+.answer-code {
+  background: var(--code-surface);
+  border-color: var(--line);
+}
+
+.answer-code-header {
+  background: var(--code-header);
+  border-color: var(--line);
+  color: var(--text-secondary);
+}
+
+.answer-code pre,
+.answer-code code {
+  background: var(--code-surface);
+  color: var(--text-body);
+}
+
+.answer-copy,
+.answer-code-header .answer-copy {
+  color: var(--text-secondary);
+}
+
+.answer-copy:hover,
+.answer-code-header .answer-copy:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.answer-table {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.answer-table th,
+.answer-table td {
+  border-color: var(--line);
+}
+
+.answer-table th,
+.answer-table tr:nth-child(even) td {
+  background: var(--surface-subtle);
+}
+
+:root[data-theme='dark'] .hljs-keyword,
+:root[data-theme='dark'] .hljs-selector-tag,
+:root[data-theme='dark'] .hljs-literal { color: #c99be8; }
+:root[data-theme='dark'] .hljs-string,
+:root[data-theme='dark'] .hljs-regexp,
+:root[data-theme='dark'] .hljs-addition { color: #86c99e; }
+:root[data-theme='dark'] .hljs-number,
+:root[data-theme='dark'] .hljs-symbol,
+:root[data-theme='dark'] .hljs-attr { color: #e1ae78; }
+:root[data-theme='dark'] .hljs-title,
+:root[data-theme='dark'] .hljs-built_in,
+:root[data-theme='dark'] .hljs-section { color: #84b5ed; }
+:root[data-theme='dark'] .hljs-comment,
+:root[data-theme='dark'] .hljs-quote { color: #8d939b; }
+:root[data-theme='dark'] .hljs-deletion { color: #e48489; }

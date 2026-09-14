@@ -1,0 +1,5 @@
+@echo off
+rem Optional: replace the next line with the command that starts your MCP server,
+rem then save this file as a .local.cmd file so Git will ignore it.
+echo Configure your MCP server start command first.
+pause

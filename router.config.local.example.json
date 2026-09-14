@@ -1,0 +1,11 @@
+{
+  "mcpServers": [
+    {
+      "id": "example",
+      "name": "Example MCP",
+      "url": "http://127.0.0.1:7338/mcp",
+      "tokenEnv": "EXAMPLE_MCP_TOKEN",
+      "enabled": true
+    }
+  ]
+}
