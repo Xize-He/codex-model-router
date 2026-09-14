@@ -18,9 +18,13 @@
 .user-message-meta button:disabled { opacity: .45; }
 .account-login { display: flex; flex-direction: column; align-items: stretch; gap: 9px; }
 .account-connection { position: relative; min-width: 0; }
-.account-trigger { display: flex; flex-direction: column; gap: 7px; width: 100%; min-width: 0; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; }
+.account-trigger { display: block; width: 100%; min-width: 0; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; }
 .account-trigger:hover,
 .account-trigger[aria-expanded='true'] { background: var(--muted); }
+.account-trigger-content { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.account-trigger-copy { display: flex; flex: 1; flex-direction: column; gap: 7px; min-width: 0; }
+.account-avatar { position: relative; display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; background: var(--surface-selected); color: var(--text-strong); font-size: 12px; font-weight: 650; line-height: 1; }
+.account-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .connection-account-name { color: var(--foreground); font-size: 13px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .connection-account-meta { display: flex !important; align-items: center; min-width: 0; margin-top: 0 !important; font-size: 11px !important; line-height: 1.5; }
 .connection-account-meta>span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

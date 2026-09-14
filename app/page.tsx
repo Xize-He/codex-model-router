@@ -57,6 +57,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -190,6 +191,7 @@ type AccountState = {
   requiresOpenaiAuth: boolean;
   type: string | null;
   displayName?: string | null;
+  avatarUrl?: string | null;
   email?: string | null;
   planType?: string | null;
   credentialSource?: string | null;
@@ -320,6 +322,8 @@ const accountTypeText: Record<string, string> = {
   agentIdentity: 'Agent Identity',
 };
 const shortModel = (m = '') => m.replace('gpt-', 'GPT-');
+const accountInitial = (name?: string | null) =>
+  Array.from((name || 'C').trim())[0]?.toUpperCase() || 'C';
 const isFinished = (s: string) =>
   ['completed', 'failed', 'interrupted'].includes(s);
 const workedFor = (startedAt: number, endedAt?: number) => {
@@ -1525,20 +1529,28 @@ export default function Home() {
             onClick={() => setAccountMenu((open) => !open)}
           >
             {online && state?.status === 'ready' && state.account?.authenticated ? (
-              <>
-                <strong className="connection-account-name">
-                  {state.account.displayName || 'ChatGPT 用户'}
-                </strong>
-                <small className="connection-account-meta">
-                  <span className="dot green" />
-                  <span>
-                    Codex 已连接
-                    {state.account.type
-                      ? ` · ${accountTypeText[state.account.type] || state.account.type}`
-                      : ''}
-                  </span>
-                </small>
-              </>
+              <div className="account-trigger-content">
+                <Avatar className="account-avatar" aria-hidden="true">
+                  {state.account.avatarUrl && (
+                    <AvatarImage src={state.account.avatarUrl} alt="" referrerPolicy="no-referrer" />
+                  )}
+                  <AvatarFallback>{accountInitial(state.account.displayName)}</AvatarFallback>
+                </Avatar>
+                <span className="account-trigger-copy">
+                  <strong className="connection-account-name">
+                    {state.account.displayName || 'ChatGPT 用户'}
+                  </strong>
+                  <small className="connection-account-meta">
+                    <span className="dot green" />
+                    <span>
+                      Codex 已连接
+                      {state.account.type
+                        ? ` · ${accountTypeText[state.account.type] || state.account.type}`
+                        : ''}
+                    </span>
+                  </small>
+                </span>
+              </div>
             ) : (
               <span className="connection-state-row">
                 <span

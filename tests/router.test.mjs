@@ -120,10 +120,12 @@ test('native turns and multi-window account limits are normalized for the UI', (
 });
 test('account state exposes display fields without credentials', () => {
   assert.deepEqual(normalizeAccount({ account: { type: 'chatgpt', email: 'user@example.com', planType: 'plus', accessToken: 'secret' }, requiresOpenaiAuth: true }, 'Example User'), {
-    loading: false, authenticated: true, requiresOpenaiAuth: true, type: 'chatgpt', displayName: 'Example User', email: 'user@example.com', planType: 'plus', credentialSource: null, error: null, login: null,
+    loading: false, authenticated: true, requiresOpenaiAuth: true, type: 'chatgpt', displayName: 'Example User', avatarUrl: null, email: 'user@example.com', planType: 'plus', credentialSource: null, error: null, login: null,
   });
   assert.equal(normalizeAccount({ account: null, requiresOpenaiAuth: true }).authenticated, false);
   assert.equal(normalizeAccount({ account: null, requiresOpenaiAuth: false }).authenticated, true);
+  assert.equal(normalizeAccount({ account: { type: 'chatgpt', picture: 'https://example.com/avatar.png' } }).avatarUrl, 'https://example.com/avatar.png');
+  assert.equal(normalizeAccount({ account: { type: 'chatgpt', picture: 'javascript:alert(1)' } }).avatarUrl, null);
 });
 test('public state does not expose MCP endpoints, credentials or tool inventory', () => {
   const e = engine();

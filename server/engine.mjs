@@ -55,26 +55,40 @@ function cleanAccountName(value) {
     ? [...value].filter(character => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127).join('').trim().slice(0, 80) || null
     : null;
 }
-function readLocalAccountName() {
+function cleanAvatarUrl(value) {
+  try {
+    if (typeof value !== 'string' || value.length > 2048) return null;
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+function readLocalAccountProfile() {
   try {
     const codexDir = process.env.CODEX_HOME || path.join(homedir(), '.codex');
     const auth = JSON.parse(readFileSync(path.join(codexDir, 'auth.json'), 'utf8'));
     const token = auth.tokens?.id_token || auth.id_token;
     const payload = token && JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    return cleanAccountName(payload?.name || payload?.preferred_username || payload?.nickname);
+    return {
+      displayName: cleanAccountName(payload?.name || payload?.preferred_username || payload?.nickname),
+      avatarUrl: cleanAvatarUrl(payload?.picture),
+    };
   } catch {
-    return null;
+    return { displayName: null, avatarUrl: null };
   }
 }
-export function normalizeAccount(result = {}, localDisplayName = null) {
+export function normalizeAccount(result = {}, localProfile = null) {
   const account = result.account || null;
   const usable = Boolean(account) || result.requiresOpenaiAuth === false;
+  const localDisplayName = typeof localProfile === 'string' ? localProfile : localProfile?.displayName;
   return {
     loading: false,
     authenticated: usable,
     requiresOpenaiAuth: result.requiresOpenaiAuth !== false,
     type: account?.type || (usable ? 'external' : null),
     displayName: cleanAccountName(account?.displayName || account?.name || account?.username || localDisplayName),
+    avatarUrl: cleanAvatarUrl(account?.avatarUrl || account?.avatar || account?.picture || localProfile?.avatarUrl),
     email: account?.email || null,
     planType: account?.planType || null,
     credentialSource: account?.credentialSource || null,
@@ -301,7 +315,7 @@ export class Engine extends EventEmitter {
     try {
       const result = await this.rpc.request('account/read', { refreshToken }, 30000);
       const login = this.account.login;
-      this.account = { ...normalizeAccount(result, readLocalAccountName()), login };
+      this.account = { ...normalizeAccount(result, readLocalAccountProfile()), login };
       return this.account;
     } catch (e) {
       this.account = { ...this.account, loading: false, error: e.message };
