@@ -1,6 +1,7 @@
 'use client';
 import {
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -56,13 +57,12 @@ import {
   PanelLeftOpen,
   MessageCirclePlus,
   GitFork,
-  GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { RoutingSettings, type RoutingConfig } from '@/components/routing-settings';
 import {
   Select,
   SelectContent,
@@ -199,14 +199,6 @@ type RateLimit = {
   secondary: RateWindow | null;
   reached?: string | null;
   credits?: { unlimited?: boolean; balance?: string | number | null } | null;
-};
-type RouteTier = {
-  level: string;
-  label: string;
-  guidance: string;
-  escalationGuidance: string;
-  model: string;
-  effort: string;
 };
 type AccountState = {
   loading: boolean;
@@ -525,72 +517,6 @@ function AttachmentList({
   );
 }
 
-function RoutingModelSelect({
-  models,
-  model,
-  effort,
-  label,
-  disabled,
-  onChange,
-}: {
-  models: Model[];
-  model: string;
-  effort: string;
-  label: string;
-  disabled?: boolean;
-  onChange: (model: string, effort: string) => void;
-}) {
-  const selectedModel = models.find((item) => item.model === model);
-  return (
-    <Select
-      value={`${model}::${effort}`}
-      disabled={disabled}
-      onValueChange={(value) => {
-        if (!value) return;
-        const [nextModel, nextEffort] = value.split('::');
-        onChange(nextModel, nextEffort);
-      }}
-    >
-      <SelectTrigger
-        className="composer-select-trigger routing-config-trigger"
-        aria-label={label}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <span className="composer-select-value">
-          {selectedModel?.displayName || shortModel(model)} · {effort}
-        </span>
-      </SelectTrigger>
-      <SelectContent
-        className="composer-select-content routing-config-content"
-        side="bottom"
-        align="end"
-        alignItemWithTrigger={false}
-      >
-        {models.map((item) => {
-          const efforts = [...new Set([
-            item.defaultReasoningEffort,
-            ...item.supportedReasoningEfforts.map((option) => option.reasoningEffort),
-          ].filter(Boolean))];
-          return (
-            <SelectGroup key={item.model}>
-              <SelectLabel>{item.displayName}</SelectLabel>
-              {efforts.map((reasoningEffort) => (
-                <SelectItem
-                  className="composer-select-item"
-                  key={reasoningEffort}
-                  value={`${item.model}::${reasoningEffort}`}
-                >
-                  {item.displayName} · {reasoningEffort}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          );
-        })}
-      </SelectContent>
-    </Select>
-  );
-}
-
 export default function Home() {
   const [state, setState] = useState<State | null>(null),
     [selected, setSelected] = useState(''),
@@ -622,12 +548,7 @@ export default function Home() {
     [deleteTarget, setDeleteTarget] = useState<Session | null>(null),
     [accountMenu, setAccountMenu] = useState(false),
     [accountBusy, setAccountBusy] = useState(''),
-    [routingBusy, setRoutingBusy] = useState(''),
     [routingOpen, setRoutingOpen] = useState(false),
-    [routingError, setRoutingError] = useState(''),
-    [routeLabelDrafts, setRouteLabelDrafts] = useState<Record<string, string>>({}),
-    [draggedTier, setDraggedTier] = useState(''),
-    [dragTarget, setDragTarget] = useState<{ level: string; position: 'before' | 'after' } | null>(null),
     [apiKey, setApiKey] = useState(''),
     [activeTurnIndex, setActiveTurnIndex] = useState(0),
     [hoveredTurnIndex, setHoveredTurnIndex] = useState<number | null>(null),
@@ -711,7 +632,6 @@ export default function Home() {
     composerInput = useRef<HTMLTextAreaElement>(null),
     historySearchInput = useRef<HTMLInputElement>(null),
     routingButtonRef = useRef<HTMLButtonElement>(null),
-    routingDialogRef = useRef<HTMLDivElement>(null),
     accountMenuRef = useRef<HTMLDivElement>(null),
     conversationRef = useRef<HTMLDivElement>(null),
     workbenchRef = useRef<HTMLDivElement>(null),
@@ -816,16 +736,10 @@ export default function Home() {
   const primaryLimit =
     state?.usage.limits.find((item) => item.id === 'codex') ||
     state?.usage.limits[0];
-  const classifierModel = state?.models.find((item) => item.model === state.config.classifier);
-  const classifierEffort = state?.config.classifierEffort || classifierModel?.defaultReasoningEffort || '';
-  const routingTiers: RouteTier[] = Object.entries(state?.config.routes || {}).map(([level, route]) => ({
-    level,
-    label: state?.config.routeLabels?.[level] || levelText[level] || level,
-    guidance: state?.config.routeGuidance?.[level] || '',
-    escalationGuidance: state?.config.routeEscalationGuidance?.[level] || '',
-    model: route.model,
-    effort: route.effort,
-  }));
+  const routingSnapshot = JSON.stringify({ config: state?.config, models: state?.models || [], activeId: state?.activeId || null });
+  const onRoutingSaved = useCallback((config: RoutingConfig) => {
+    setState((current) => current ? { ...current, config } : current);
+  }, []);
   const contextTokens = session?.context?.last?.totalTokens || 0,
     contextWindow = session?.context?.modelContextWindow || 0;
   const contextPercent = contextWindow
@@ -1052,86 +966,6 @@ export default function Home() {
   }
   function rememberInspectorSection(key: InspectorSectionKey, open: boolean) {
     setInspectorSections((current) => current[key] === open ? current : { ...current, [key]: open });
-  }
-  async function updateRoutingConfig(
-    key: string,
-    input: {
-      classifier?: string;
-      classifierEffort?: string;
-      level?: string;
-      model?: string;
-      effort?: string;
-      label?: string;
-      guidance?: string;
-      escalationGuidance?: string;
-      tiers?: RouteTier[];
-      routeOrder?: string[];
-    },
-  ): Promise<boolean> {
-    try {
-      setError('');
-      setRoutingError('');
-      setRoutingBusy(key);
-      const result = await post<{ ok: boolean; config: State['config'] }>('config/routing', input);
-      setState((current) => current ? { ...current, config: result.config } : current);
-      return true;
-    } catch (e) {
-      setError((e as Error).message);
-      setRoutingError((e as Error).message);
-      return false;
-    } finally {
-      setRoutingBusy('');
-    }
-  }
-  async function saveRouteText(tier: RouteTier, field: 'label' | 'guidance' | 'escalationGuidance', value: string) {
-    const normalized = value.trim();
-    if ((!normalized && field !== 'escalationGuidance') || normalized === tier[field]) return true;
-    return updateRoutingConfig(`${tier.level}:${field}`, {
-      level: tier.level,
-      [field]: normalized,
-    });
-  }
-  function replaceRoutingTiers(key: string, tiers: RouteTier[]) {
-    void updateRoutingConfig(key, { tiers });
-  }
-  function dropRoutingTier(sourceLevel: string, targetLevel: string, position: 'before' | 'after') {
-    if (!sourceLevel || sourceLevel === targetLevel) return;
-    const next = [...routingTiers];
-    const sourceIndex = next.findIndex((tier) => tier.level === sourceLevel);
-    if (sourceIndex < 0 || !next.some((tier) => tier.level === targetLevel)) return;
-    const [moved] = next.splice(sourceIndex, 1);
-    const targetIndex = next.findIndex((tier) => tier.level === targetLevel);
-    next.splice(targetIndex + (position === 'after' ? 1 : 0), 0, moved);
-    if (next.every((tier, index) => tier.level === routingTiers[index]?.level)) return;
-    void updateRoutingConfig('tiers:reorder', { routeOrder: next.map((tier) => tier.level) });
-  }
-  function addRoutingTier() {
-    if (routingTiers.length >= 12) return;
-    const previous = routingTiers.at(-1);
-    const fallbackModel = previous?.model || state?.models[0]?.model;
-    const fallbackCatalog = state?.models.find((item) => item.model === fallbackModel);
-    const fallbackEffort = previous?.effort || fallbackCatalog?.defaultReasoningEffort || '';
-    if (!fallbackModel || !fallbackEffort) return;
-    let sequence = routingTiers.length + 1;
-    while (routingTiers.some((tier) => tier.level === `custom-${sequence}`)) sequence += 1;
-    const level = `custom-${sequence}`;
-    replaceRoutingTiers('tiers:add', [
-      ...routingTiers,
-      {
-        level,
-        label: `自定义任务 ${routingTiers.length + 1}`,
-        escalationGuidance: '',
-        guidance: previous
-          ? `比“${previous.label}”更复杂、影响范围更广或错误成本更高的任务`
-          : '根据任务复杂度、工具步骤、影响范围和错误成本选择该档位',
-        model: fallbackModel,
-        effort: fallbackEffort,
-      },
-    ]);
-  }
-  function removeRoutingTier(index: number) {
-    if (routingTiers.length <= 2) return;
-    replaceRoutingTiers('tiers:remove', routingTiers.filter((_, tierIndex) => tierIndex !== index));
   }
   async function startLogin(type: 'chatgpt' | 'chatgptDeviceCode' | 'apiKey') {
     try {
@@ -1473,7 +1307,7 @@ export default function Home() {
             aria-label="模型路由配置"
             title="模型路由配置"
             aria-haspopup="dialog"
-            onClick={() => { setRoutingError(''); setRoutingOpen(true); }}
+            onClick={() => setRoutingOpen(true)}
             disabled={!state}
           >
             <GitFork className="sidebar-action-icon" size={18} strokeWidth={1.75} />
@@ -2647,201 +2481,14 @@ export default function Home() {
           </section>
         </aside>
       )}
-      <Dialog open={routingOpen} onOpenChange={(open) => {
-        if (!open && routingDialogRef.current?.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
-        setRoutingOpen(open);
-      }}>
-        <DialogContent className="routing-settings-dialog" ref={routingDialogRef} finalFocus={routingButtonRef}>
-          <DialogHeader className="routing-settings-header">
-            <DialogTitle>模型路由配置</DialogTitle>
-            <DialogDescription>管理判断模型、各档位的执行模型和升级规则。点击输入框外自动保存。</DialogDescription>
-            {state?.activeId && <p className="routing-settings-notice">任务运行中，配置暂不可修改。</p>}
-            {routingBusy && <output className="routing-settings-notice">正在保存…</output>}
-            {routingError && <p className="inline-error" role="alert">{routingError}</p>}
-          </DialogHeader>
-              <div className="routing-details-content">
-
-                {state?.config.classifier && classifierEffort && (
-                  <div className="routing-config-row classifier-row">
-                    <span>判断模型</span>
-                    <RoutingModelSelect
-                      models={state.models}
-                      model={state.config.classifier}
-                      effort={classifierEffort}
-                      label="选择判断模型和推理强度"
-                      disabled={!!state.activeId || !!routingBusy}
-                      onChange={(nextModel, nextEffort) => void updateRoutingConfig('classifier', {
-                        classifier: nextModel,
-                        classifierEffort: nextEffort,
-                      })}
-                    />
-                  </div>
-                )}
-                <p>
-                  分类器按档位名称、描述和上下文判断复杂度，模型与强度由下方映射决定。
-                  请按能力由低到高排列。新建会话在 Auto 模式下可根据执行中发现的复杂度自动升档，每个任务最多一次。
-                </p>
-                <div className="routing-tier-list">
-                  {routingTiers.map((tier, index) => {
-                    const visibleLabel = routeLabelDrafts[tier.level] ?? tier.label;
-                    return (
-                    <details
-                      className={`routing-tier-card${draggedTier === tier.level ? ' dragging' : ''}${dragTarget?.level === tier.level ? ` drop-${dragTarget.position}` : ''}`}
-                      key={tier.level}
-                    >
-                      <summary
-                        onDragOver={(event) => {
-                          if (!draggedTier || draggedTier === tier.level) return;
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = 'move';
-                          const bounds = event.currentTarget.getBoundingClientRect();
-                          const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
-                          setDragTarget((current) => current?.level === tier.level && current.position === position
-                            ? current
-                            : { level: tier.level, position });
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          const sourceLevel = event.dataTransfer.getData('text/plain') || draggedTier;
-                          if (dragTarget?.level === tier.level) {
-                            dropRoutingTier(sourceLevel, tier.level, dragTarget.position);
-                          }
-                          setDraggedTier('');
-                          setDragTarget(null);
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="routing-tier-drag"
-                          draggable={!state?.activeId && !routingBusy}
-                          aria-label={`拖动${visibleLabel || tier.label}调整顺序`}
-                          title="拖动调整顺序"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }}
-                          onDragStart={(event) => {
-                            event.stopPropagation();
-                            event.dataTransfer.effectAllowed = 'move';
-                            event.dataTransfer.setData('text/plain', tier.level);
-                            setDraggedTier(tier.level);
-                            setDragTarget(null);
-                          }}
-                          onDragEnd={() => {
-                            setDraggedTier('');
-                            setDragTarget(null);
-                          }}
-                        >
-                          <GripVertical size={14} />
-                        </button>
-                        <span className="routing-tier-index">{index + 1}</span>
-                        <span className="routing-tier-summary">
-                          <strong>{visibleLabel}</strong>
-                        </span>
-                        <ChevronRight className="routing-tier-chevron" size={14} />
-                        <RoutingModelSelect
-                          models={state?.models || []}
-                          model={tier.model}
-                          effort={tier.effort}
-                          label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
-                          disabled={!!state?.activeId || !!routingBusy}
-                          onChange={(nextModel, nextEffort) => void updateRoutingConfig(tier.level, {
-                            level: tier.level,
-                            model: nextModel,
-                            effort: nextEffort,
-                          })}
-                        />
-                      </summary>
-                      <div className="routing-tier-editor">
-                        <label>
-                          <span>名称</span>
-                          <input
-                            key={`label-${tier.level}-${tier.label}`}
-                            defaultValue={tier.label}
-                            maxLength={30}
-                            disabled={!!state?.activeId || !!routingBusy}
-                            onChange={(event) => {
-                              const nextLabel = event.currentTarget.value;
-                              setRouteLabelDrafts((current) => ({
-                                ...current,
-                                [tier.level]: nextLabel,
-                              }));
-                            }}
-                            onBlur={async (event) => {
-                              const input = event.currentTarget;
-                              const nextLabel = input.value.trim();
-                              const saved = nextLabel
-                                ? await saveRouteText(tier, 'label', nextLabel)
-                                : false;
-                              if (!saved) input.value = tier.label;
-                              setRouteLabelDrafts((current) => {
-                                const next = { ...current };
-                                delete next[tier.level];
-                                return next;
-                              });
-                            }}
-                          />
-                        </label>
-                        <label>
-                          <span>判断描述</span>
-                          <textarea
-                            key={`guidance-${tier.level}-${tier.guidance}`}
-                            defaultValue={tier.guidance}
-                            maxLength={600}
-                            rows={3}
-                            disabled={!!state?.activeId || !!routingBusy}
-                            onBlur={(event) => {
-                              if (!event.currentTarget.value.trim()) event.currentTarget.value = tier.guidance;
-                              else void saveRouteText(tier, 'guidance', event.currentTarget.value);
-                            }}
-                          />
-                        </label>
-                        <label>
-                          <span>升级判断规则</span>
-                          <textarea
-                            key={`escalation-${tier.level}-${tier.escalationGuidance}`}
-                            defaultValue={tier.escalationGuidance}
-                            maxLength={600}
-                            rows={3}
-                            placeholder="哪些新发现需要升档？留空则由模型按任务判断。"
-                            disabled={!!state?.activeId || !!routingBusy}
-                            onBlur={async (event) => {
-                              const input = event.currentTarget;
-                              const saved = await saveRouteText(tier, 'escalationGuidance', input.value);
-                              if (!saved) input.value = tier.escalationGuidance;
-                            }}
-                          />
-                        </label>
-                        <div className="routing-tier-actions">
-                          <button
-                            type="button"
-                            className="danger"
-                            aria-label={`删除${visibleLabel || tier.label}`}
-                            disabled={routingTiers.length <= 2 || !!state?.activeId || !!routingBusy}
-                            onClick={() => removeRoutingTier(index)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </details>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    className="routing-tier-add"
-                    disabled={routingTiers.length >= 12 || !!state?.activeId || !!routingBusy}
-                    onClick={addRoutingTier}
-                  >
-                    <Plus size={14} />
-                    添加档位
-                  </button>
-                </div>
-              </div>
-        </DialogContent>
-      </Dialog>
+      <RoutingSettings
+        routingOpen={routingOpen}
+        setRoutingOpen={setRoutingOpen}
+        routingButtonRef={routingButtonRef}
+        snapshot={routingSnapshot}
+        csrfToken={csrf.current}
+        onSaved={onRoutingSaved}
+      />
       <AlertDialog
         open={!!renameTarget}
         onOpenChange={(open) => {
