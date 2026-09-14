@@ -554,6 +554,7 @@ function RoutingModelSelect({
       <SelectTrigger
         className="composer-select-trigger routing-config-trigger"
         aria-label={label}
+        onClick={(event) => event.stopPropagation()}
       >
         <span className="composer-select-value">
           {selectedModel?.displayName || shortModel(model)} · {effort}
@@ -2697,9 +2698,20 @@ export default function Home() {
                         <span className="routing-tier-index">{index + 1}</span>
                         <span className="routing-tier-summary">
                           <strong>{visibleLabel}</strong>
-                          <small>{shortModel(tier.model)} · {tier.effort}</small>
                         </span>
                         <ChevronRight className="routing-tier-chevron" size={14} />
+                        <RoutingModelSelect
+                          models={state?.models || []}
+                          model={tier.model}
+                          effort={tier.effort}
+                          label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
+                          disabled={!!state?.activeId || !!routingBusy}
+                          onChange={(nextModel, nextEffort) => void updateRoutingConfig(tier.level, {
+                            level: tier.level,
+                            model: nextModel,
+                            effort: nextEffort,
+                          })}
+                        />
                       </summary>
                       <div className="routing-tier-editor">
                         <label>
@@ -2761,21 +2773,6 @@ export default function Home() {
                             }}
                           />
                         </label>
-                        <div className="routing-tier-model">
-                          <span>执行模型</span>
-                          <RoutingModelSelect
-                            models={state?.models || []}
-                            model={tier.model}
-                            effort={tier.effort}
-                            label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
-                            disabled={!!state?.activeId || !!routingBusy}
-                            onChange={(nextModel, nextEffort) => void updateRoutingConfig(tier.level, {
-                              level: tier.level,
-                              model: nextModel,
-                              effort: nextEffort,
-                            })}
-                          />
-                        </div>
                         <div className="routing-tier-actions">
                           <button
                             type="button"
