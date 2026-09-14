@@ -54,7 +54,8 @@ import {
   ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
-  SquarePen,
+  MessageCirclePlus,
+  GitFork,
   GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -1462,7 +1463,7 @@ export default function Home() {
             onClick={create}
             disabled={busy || !online}
           >
-            <SquarePen size={17} />
+            <MessageCirclePlus className="sidebar-action-icon" size={18} strokeWidth={1.75} />
             新对话
           </Button>
           <Button
@@ -1475,7 +1476,7 @@ export default function Home() {
             onClick={() => { setRoutingError(''); setRoutingOpen(true); }}
             disabled={!state}
           >
-            <SlidersHorizontal size={17} />
+            <GitFork className="sidebar-action-icon" size={18} strokeWidth={1.75} />
             <span>模型路由配置</span>
           </Button>
         </div>

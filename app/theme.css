@@ -10,6 +10,9 @@
 .sidebar-primary-actions { display: grid; gap: 5px; margin-bottom: 4px; }
 .sidebar-primary-actions .new-chat { height: 38px; padding: 0 11px; border-color: transparent; border-radius: 9px; background: transparent; color: var(--text-strong); font-weight: 500; box-shadow: none; }
 .sidebar-primary-actions .new-chat:hover:not(:disabled) { background: var(--surface-hover); }
+.sidebar-primary-actions :is(.new-chat, .routing-settings-button) { gap: 10px; }
+.sidebar-primary-actions .sidebar-action-icon { width: 18px; height: 18px; flex: 0 0 18px; color: var(--text-secondary); }
+.sidebar-primary-actions button:hover:not(:disabled) .sidebar-action-icon { color: var(--text-strong); }
 .sidebar-expand { flex: 0 0 32px; margin-right: 9px; }
 .sidebar-collapsed .sidebar { width: 0; min-width: 0; padding-right: 0; padding-left: 0; border-right-color: transparent; overflow: hidden; }
 .sidebar-collapsed .sidebar > * { visibility: hidden; opacity: 0; pointer-events: none; }
