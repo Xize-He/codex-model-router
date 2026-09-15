@@ -57,6 +57,14 @@ const modelCapabilityOrder = [
   /^gpt-5\.5(?:$|-)/i,
   /^gpt-5\.3-codex-spark(?:$|-)/i,
 ];
+const reasoningEffortOrder = [
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+];
 function sortModelsByCapability(models: Model[]) {
   return models
     .map((model, index) => ({
@@ -130,7 +138,15 @@ function RoutingModelSelect({
                   ),
                 ].filter(Boolean),
               ),
-            ];
+            ].sort((left, right) => {
+              const leftRank = reasoningEffortOrder.indexOf(left);
+              const rightRank = reasoningEffortOrder.indexOf(right);
+              return (
+                (leftRank < 0 ? reasoningEffortOrder.length : leftRank) -
+                  (rightRank < 0 ? reasoningEffortOrder.length : rightRank) ||
+                left.localeCompare(right)
+              );
+            });
             return (
               <SelectGroup key={item.model}>
                 <SelectLabel>{item.displayName}</SelectLabel>
