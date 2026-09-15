@@ -443,27 +443,18 @@ export const RoutingSettings = memo(function RoutingSettings({
                     </button>
                     <ChevronRight className="routing-tier-chevron" size={14} />
                     <span className="routing-tier-summary">
-                      <strong>{visibleLabel}</strong>
-                    </span>
-                    <RoutingModelSelect
-                      models={state?.models || []}
-                      model={tier.model}
-                      effort={tier.effort}
-                      label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
-                      disabled={!!state.activeId}
-                      onChange={(nextModel, nextEffort) =>
-                        void updateRoutingConfig(tier.level, {
-                          level: tier.level,
-                          model: nextModel,
-                          effort: nextEffort,
-                        })
-                      }
-                    />
-                  </summary>
-                  <div className="routing-tier-editor">
-                    <label>
-                      <span>名称</span>
                       <input
+                        className="routing-tier-name"
+                        aria-label={`${tier.level.toUpperCase()} 档位名称`}
+                        title="编辑档位名称"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                            event.stopPropagation();
+                            event.preventDefault();
+                            event.currentTarget.blur();
+                          }
+                        }}
                         key={`label-${tier.level}`}
                         defaultValue={tier.label}
                         maxLength={30}
@@ -491,7 +482,23 @@ export const RoutingSettings = memo(function RoutingSettings({
                           });
                         }}
                       />
-                    </label>
+                    </span>
+                    <RoutingModelSelect
+                      models={state?.models || []}
+                      model={tier.model}
+                      effort={tier.effort}
+                      label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
+                      disabled={!!state.activeId}
+                      onChange={(nextModel, nextEffort) =>
+                        void updateRoutingConfig(tier.level, {
+                          level: tier.level,
+                          model: nextModel,
+                          effort: nextEffort,
+                        })
+                      }
+                    />
+                  </summary>
+                  <div className="routing-tier-editor">
                     <label>
                       <span>判断描述</span>
                       <textarea
