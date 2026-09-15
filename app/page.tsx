@@ -564,6 +564,14 @@ export default function Home() {
         return false;
       }
     }),
+    [sessionsCollapsed, setSessionsCollapsed] = useState(() => {
+      try {
+        return typeof window !== 'undefined' &&
+          localStorage.getItem('model-router-sessions-collapsed') === 'true';
+      } catch {
+        return false;
+      }
+    }),
     [conversationMode, setConversationMode] = useState<'flow' | 'cards'>(() => {
       try {
         return typeof window !== 'undefined' &&
@@ -621,6 +629,13 @@ export default function Home() {
       /* Sidebar collapsing still works when browser storage is unavailable. */
     }
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('model-router-sessions-collapsed', String(sessionsCollapsed));
+    } catch {
+      /* Session folding still works when browser storage is unavailable. */
+    }
+  }, [sessionsCollapsed]);
   useEffect(() => {
     try {
       localStorage.setItem('model-router-inspector-sections', JSON.stringify(inspectorSections));
@@ -1338,11 +1353,21 @@ export default function Home() {
             </SelectContent>
           </Select>
         </div>
-        <div className="sidebar-label">
-          <span>
-            会话管理
-          </span>
+        <section className={`session-section ${sessionsCollapsed ? 'collapsed' : ''}`}>
+        <div className="session-section-header">
           <button
+            type="button"
+            className="session-section-toggle"
+            aria-expanded={!sessionsCollapsed}
+            aria-controls="sidebar-session-list"
+            onClick={() => setSessionsCollapsed((current) => !current)}
+          >
+            <ChevronRight className="session-section-chevron" size={16} strokeWidth={1.75} />
+            <span>会话</span>
+            <b>{activeSessionCount}</b>
+          </button>
+          <button
+            className="session-section-refresh"
             aria-label="刷新原生历史"
             title="刷新原生历史"
             onClick={() => void refreshSessions()}
@@ -1355,12 +1380,13 @@ export default function Home() {
             />
           </button>
         </div>
+        <div className="session-section-body" id="sidebar-session-list">
         <div className="session-view-toggle" aria-label="会话范围">
           <button
             className={sessionView === 'active' ? 'selected' : ''}
             onClick={() => void showSessionView('active')}
           >
-            会话 <b>{activeSessionCount}</b>
+            当前 <b>{activeSessionCount}</b>
           </button>
           <button
             className={sessionView === 'archived' ? 'selected' : ''}
@@ -1455,6 +1481,8 @@ export default function Home() {
             历史同步失败：{state.history.error}
           </div>
         )}
+        </div>
+        </section>
         <div className="connection-box account-connection" ref={accountMenuRef}>
           {accountMenu && (
             <div className="account-popover" role="dialog" aria-label="Codex 账户操作">
