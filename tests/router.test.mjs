@@ -47,15 +47,22 @@ test('web search choices map to Codex native search modes', () => {
   assert.deepEqual(webSearchSettings('disabled'), { web_search: 'disabled' });
   assert.throws(() => webSearchSettings('unknown'), /联网搜索设置无效/);
 });
-test('a conversation keeps the native web search mode selected at creation', () => {
-  const e = engine(), s = e.createSession({ webSearchMode: 'disabled' });
+test('an existing conversation applies a changed web search mode before the next turn', async () => {
+  const e = engine(), s = e.createSession({ webSearchMode: 'disabled' }), calls = [];
   s.threadId = 'existing-thread';
-  assert.throws(
-    () => e.submit({ sessionId: s.id, prompt: '搜索最新信息', model: 'small', webSearchMode: 'enabled' }),
-    /新建对话/,
-  );
-  assert.equal(e.active, null);
-  assert.equal(s.webSearchMode, 'disabled');
+  s.loaded = true;
+  s.appliedWebSearchMode = 'disabled';
+  e.refreshUsage = async () => {}; e.syncNativeHistory = async () => {};
+  e.rpc = { request: async (method, params) => { calls.push({ method, params }); return {}; } };
+  e.runTurn = async () => { calls.push({ method: 'execution' }); };
+  const task = e.submit({ sessionId: s.id, prompt: '搜索最新信息', model: 'small', webSearchMode: 'enabled' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(task.status, 'completed');
+  assert.equal(s.webSearchMode, 'enabled');
+  assert.equal(s.appliedWebSearchMode, 'enabled');
+  assert.equal(calls[0].method, 'thread/resume');
+  assert.equal(calls[0].params.config.web_search, 'live');
+  assert.equal(calls[1].method, 'execution');
 });
 test('Approve for me is applied when a router thread is created', async () => {
   const e = engine(), s = e.createSession(), calls = [];

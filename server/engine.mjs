@@ -736,7 +736,6 @@ export class Engine extends EventEmitter {
     const session = this.findSession(sessionId); if (!session) throw new Error('对话不存在');
     if (!['ask', 'approve-for-me'].includes(approvalMode)) throw new Error('审批方式无效');
     webSearchSettings(webSearchMode);
-    if (session.threadId && webSearchMode !== (session.webSearchMode || 'auto')) throw new Error('联网搜索模式在会话开始后不能更改，请新建对话后选择');
     if (session.native && !session.historyLoaded) throw new Error('请等待原生会话历史加载完成');
     if (session.occupied === true && !session.loaded) throw new Error('该会话仍被另一个 Codex 客户端占用。请完全退出持有它的客户端并刷新页面后重试');
     session.approvalMode = approvalMode;
@@ -755,7 +754,7 @@ export class Engine extends EventEmitter {
       const webSearch = webSearchSettings(task.webSearchMode);
       // Acquire the existing conversation before spending a classifier call.
       // Thread status is local to an app-server and cannot prove another process released its writer.
-      if (session.threadId && !session.loaded) {
+      if (session.threadId && (!session.loaded || session.appliedWebSearchMode !== task.webSearchMode)) {
         await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, config: webSearch, ...approval });
         session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; this.setOccupancy(session, false);
       } else if (session.threadId && session.appliedApprovalMode !== task.approvalMode) {

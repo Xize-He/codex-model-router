@@ -747,9 +747,7 @@ export default function Home() {
   const session = state?.sessions.find((s) => s.id === selected),
     tasks = session?.tasks || [],
     last = tasks.at(-1);
-  const activeWebSearchMode = session?.threadId
-    ? session.webSearchMode || 'auto'
-    : webSearchMode;
+  const activeWebSearchMode = webSearchMode;
   const activeTaskIsSelected = Boolean(
     state?.activeId && tasks.some((task) => task.id === state.activeId),
   );
@@ -1372,14 +1370,14 @@ export default function Home() {
               <SelectItem className="composer-select-item" value="cards"><PanelsTopLeft size={14} />卡片</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={activeWebSearchMode} onValueChange={(value) => value && setWebSearchMode(value as 'auto' | 'enabled' | 'disabled')} disabled={Boolean(session?.threadId)}>
-            <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title={session?.threadId ? '联网搜索模式在新对话开始时确定' : '选择 Codex 原生联网搜索方式'}>
+          <Select value={activeWebSearchMode} onValueChange={(value) => value && setWebSearchMode(value as 'auto' | 'enabled' | 'disabled')}>
+            <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title="保存为默认设置；当前对话从下一条消息开始使用">
               <Globe2 className="sidebar-action-icon" size={18} strokeWidth={1.75} />
               <span className="sidebar-preference-label">联网搜索</span>
-              <span className="sidebar-preference-value">{{ auto: '自动', enabled: '开启', disabled: '关闭' }[activeWebSearchMode]}</span>
+              <span className="sidebar-preference-value">{{ auto: '默认（缓存）', enabled: '开启', disabled: '关闭' }[activeWebSearchMode]}</span>
             </SelectTrigger>
             <SelectContent className="composer-select-content" align="start" alignItemWithTrigger={false}>
-              <SelectItem className="composer-select-item" value="auto">自动</SelectItem>
+              <SelectItem className="composer-select-item" value="auto">默认（缓存）</SelectItem>
               <SelectItem className="composer-select-item" value="enabled">开启</SelectItem>
               <SelectItem className="composer-select-item" value="disabled">关闭</SelectItem>
             </SelectContent>
