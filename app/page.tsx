@@ -53,7 +53,7 @@ import {
   LogOut,
   KeyRound,
   ExternalLink,
-  PanelLeftClose,
+  PanelLeft,
   PanelLeftOpen,
   MessageCirclePlus,
   GitFork,
@@ -1278,7 +1278,7 @@ export default function Home() {
               title="搜索会话"
               onClick={() => void openSessionSearch()}
             >
-              <Search size={17} />
+              <Search className="sidebar-action-icon" size={18} strokeWidth={1.75} />
             </button>
             <button
               type="button"
@@ -1289,7 +1289,7 @@ export default function Home() {
                 setHistorySearchOpen(false);
               }}
             >
-              <PanelLeftClose size={17} />
+              <PanelLeft className="sidebar-action-icon" size={18} strokeWidth={1.75} />
             </button>
           </div>
         </div>

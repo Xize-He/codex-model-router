@@ -2,9 +2,11 @@
 .sidebar { padding-top: 20px; transition: width 180ms ease, padding 180ms ease, border-color 180ms ease; }
 .sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px 18px 8px; }
 .sidebar-header .sidebar-title { min-width: 0; padding: 0; }
-.sidebar-header-actions { display: flex; align-items: center; gap: 2px; }
+.sidebar-header-actions { display: flex; align-items: center; gap: 4px; }
 .sidebar-header-actions button,
-.sidebar-expand { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); }
+.sidebar-expand { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); }
+.sidebar-header-actions button { transition: background-color 120ms ease, color 120ms ease; }
+.sidebar-header-actions .sidebar-action-icon { width: 18px; height: 18px; color: inherit; }
 .sidebar-header-actions button:hover,
 .sidebar-expand:hover { background: var(--surface-hover); color: var(--text-strong); }
 .sidebar-primary-actions { display: grid; gap: 5px; margin-bottom: 4px; }
