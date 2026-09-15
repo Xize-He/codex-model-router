@@ -1856,7 +1856,7 @@ export default function Home() {
                 disabled={activeTurnIndex === 0}
                 onClick={() => goToTurn(activeTurnIndex - 1)}
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={22} strokeWidth={1.8} />
               </button>
               <button
                 type="button"
@@ -1866,7 +1866,7 @@ export default function Home() {
                 disabled={activeTurnIndex === tasks.length - 1}
                 onClick={() => goToTurn(activeTurnIndex + 1)}
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={22} strokeWidth={1.8} />
               </button>
             </>
           )}

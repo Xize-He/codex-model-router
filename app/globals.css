@@ -427,7 +427,7 @@ footer::before { content: ''; position: absolute; z-index: -1; left: 0; right: 0
   flex: 0 0 100%;
   height: 100%;
   margin: 0;
-  padding: 10px max(44px, calc((100% - 760px) / 2)) 28px;
+  padding: 10px max(64px, calc((100% - 760px) / 2)) 28px;
   overflow-x: hidden;
   overflow-y: auto;
   scroll-snap-align: start;
@@ -440,17 +440,19 @@ footer::before { content: ''; position: absolute; z-index: -1; left: 0; right: 0
   top: 50%;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 104px;
   padding: 0;
   border: 1px solid #d2d2d2;
-  border-radius: 50%;
+  border-radius: 16px;
   background: rgb(255 255 255 / 90%);
   color: #555555;
   box-shadow: 0 3px 12px rgb(0 0 0 / 10%);
   transform: translateY(-50%);
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
-.card-step:hover:not(:disabled) { background: #f0f0f0; color: #202020; }
+.card-step:hover:not(:disabled) { background: #f0f0f0; color: #202020; box-shadow: 0 5px 18px rgb(0 0 0 / 14%); transform: translateY(-50%) scale(1.03); }
+.card-step:active:not(:disabled) { transform: translateY(-50%) scale(.97); }
 .card-step:disabled { opacity: 0; pointer-events: none; }
 .card-step-previous { left: max(8px, calc((100% - 760px) / 2 - 160px)); }
 .card-step-next { right: max(8px, calc((100% - 760px) / 2 - 160px)); }
@@ -532,10 +534,10 @@ footer::before { content: ''; position: absolute; z-index: -1; left: 0; right: 0
 @media (max-width: 700px) {
   .flow-stage .turn-ruler { left: 6px; width: 18px; }
   .flow-stage .turn-ruler button { width: 18px; }
-  .conversation.card-view > .turn { padding-right: 28px; padding-left: 28px; }
-  .card-step { width: 28px; height: 28px; }
-  .card-step-previous { left: 1px; }
-  .card-step-next { right: 1px; }
+  .conversation.card-view > .turn { padding-right: 48px; padding-left: 48px; }
+  .card-step { width: 36px; height: 76px; border-radius: 13px; }
+  .card-step-previous { left: 3px; }
+  .card-step-next { right: 3px; }
   .panel-resizer { display: none; }
 }
 
