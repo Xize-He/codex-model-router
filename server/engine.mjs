@@ -28,6 +28,11 @@ export function sessionError(error) {
     : error.message;
 }
 export function approvalSettings(mode = 'approve-for-me') { return { approvalPolicy: 'on-request', approvalsReviewer: mode === 'approve-for-me' ? 'auto_review' : 'user' }; }
+export function webSearchSettings(mode = 'auto') {
+  const mapped = { auto: 'cached', enabled: 'live', disabled: 'disabled' }[mode];
+  if (!mapped) throw new Error('联网搜索设置无效');
+  return { web_search: mapped };
+}
 const historySourceKinds = ['cli', 'vscode', 'appServer', 'unknown'];
 const cleanWindow = window => window ? {
   usedPercent: Math.max(0, Math.min(100, Number(window.usedPercent) || 0)),
@@ -225,7 +230,7 @@ export class Engine extends EventEmitter {
     this.createProbeRpc = () => new CodexRPC({ secretEnv });
     if (existsSync(this.historyPath)) {
       try { this.sessions = JSON.parse(readFileSync(this.historyPath, 'utf8')); } catch { this.error = '历史记录无法读取，原文件已保留'; this.historyPath = path.join(this.dataDir, `history-recovered-${Date.now()}.json`); }
-      for (const s of this.sessions) { s.loaded = false; s.source ||= 'router'; s.updatedAt ||= s.createdAt; s.context ||= null; s.compaction ||= { status: 'idle', lastAt: null }; s.approvalMode ||= 'approve-for-me'; s.appliedApprovalMode = null; s.mcpServerIds ||= s.mcpAttached ? this.config.mcpServers.slice(0, 1).map(item => item.id) : []; this.applyOccupancy(s); for (const t of s.tasks) if (!terminal(t.status)) { t.status = 'interrupted'; t.error = '上次服务退出，任务未自动重试'; } }
+      for (const s of this.sessions) { s.loaded = false; s.source ||= 'router'; s.updatedAt ||= s.createdAt; s.context ||= null; s.compaction ||= { status: 'idle', lastAt: null }; s.approvalMode ||= 'approve-for-me'; s.appliedApprovalMode = null; s.webSearchMode ||= 'auto'; s.appliedWebSearchMode = null; s.mcpServerIds ||= s.mcpAttached ? this.config.mcpServers.slice(0, 1).map(item => item.id) : []; this.applyOccupancy(s); for (const t of s.tasks) if (!terminal(t.status)) { t.status = 'interrupted'; t.error = '上次服务退出，任务未自动重试'; } }
     }
     this.mcp = new McpRegistry(this.config.mcpServers);
     this.mcpStatuses = this.mcp.statuses();
@@ -637,8 +642,9 @@ export class Engine extends EventEmitter {
     this.mcpStatuses = await this.mcp.connectAll();
     this.changed(); return this.mcpStatuses;
   }
-  createSession() {
-    const session = { id: randomUUID(), title: '新对话', threadId: null, tasks: [], createdAt: Date.now(), updatedAt: Date.now(), loaded: false, source: 'router', context: null, compaction: { status: 'idle', lastAt: null }, approvalMode: 'approve-for-me', appliedApprovalMode: null };
+  createSession({ webSearchMode = 'auto' } = {}) {
+    webSearchSettings(webSearchMode);
+    const session = { id: randomUUID(), title: '新对话', threadId: null, tasks: [], createdAt: Date.now(), updatedAt: Date.now(), loaded: false, source: 'router', context: null, compaction: { status: 'idle', lastAt: null }, approvalMode: 'approve-for-me', appliedApprovalMode: null, webSearchMode, appliedWebSearchMode: null };
     this.sessions.unshift(session); this.save(); return session;
   }
   async archiveSession({ sessionId }) {
@@ -720,7 +726,7 @@ export class Engine extends EventEmitter {
     if (items.length > MAX_ATTACHMENTS) throw new Error('每次最多发送 8 个附件');
     return [...new Set(items.map(item => String(item?.id || '')))].map(id => this.attachmentInfo(id));
   }
-  submit({ sessionId, prompt, attachments = [], model = 'auto', effort = 'auto', approvalMode = 'approve-for-me' }) {
+  submit({ sessionId, prompt, attachments = [], model = 'auto', effort = 'auto', approvalMode = 'approve-for-me', webSearchMode = 'auto' }) {
     if (this.status !== 'ready') throw new Error('Codex 尚未就绪');
     if (this.active) throw new Error('已有任务运行中，请先停止或等待完成');
     if (typeof prompt !== 'string' || prompt.length > 50000) throw new Error('问题不能超过 50000 字符');
@@ -729,10 +735,13 @@ export class Engine extends EventEmitter {
     if (model !== 'auto') pickRoute(this.config, this.models, Object.keys(this.config.routes || {})[0], model, effort);
     const session = this.findSession(sessionId); if (!session) throw new Error('对话不存在');
     if (!['ask', 'approve-for-me'].includes(approvalMode)) throw new Error('审批方式无效');
+    webSearchSettings(webSearchMode);
+    if (session.threadId && webSearchMode !== (session.webSearchMode || 'auto')) throw new Error('联网搜索模式在会话开始后不能更改，请新建对话后选择');
     if (session.native && !session.historyLoaded) throw new Error('请等待原生会话历史加载完成');
     if (session.occupied === true && !session.loaded) throw new Error('该会话仍被另一个 Codex 客户端占用。请完全退出持有它的客户端并刷新页面后重试');
     session.approvalMode = approvalMode;
-    const task = { id: randomUUID(), prompt: prompt.trim() || '请查看并处理附件。', attachments: resolvedAttachments, status: model === 'auto' ? 'classifying' : 'starting', mode: model, approvalMode,
+    session.webSearchMode = webSearchMode;
+    const task = { id: randomUUID(), prompt: prompt.trim() || '请查看并处理附件。', attachments: resolvedAttachments, status: model === 'auto' ? 'classifying' : 'starting', mode: model, approvalMode, webSearchMode,
       requestedEffort: effort, startedAt: Date.now(), messages: [], events: [], route: null, error: null };
     session.tasks.push(task); if (session.tasks.length === 1) session.title = task.prompt.slice(0, 28);
     session.updatedAt = Date.now();
@@ -743,11 +752,12 @@ export class Engine extends EventEmitter {
     const { task, session } = ctx;
     try {
       const approval = approvalSettings(task.approvalMode);
+      const webSearch = webSearchSettings(task.webSearchMode);
       // Acquire the existing conversation before spending a classifier call.
       // Thread status is local to an app-server and cannot prove another process released its writer.
       if (session.threadId && !session.loaded) {
-        await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, ...approval });
-        session.loaded = true; session.appliedApprovalMode = task.approvalMode; this.setOccupancy(session, false);
+        await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, config: webSearch, ...approval });
+        session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; this.setOccupancy(session, false);
       } else if (session.threadId && session.appliedApprovalMode !== task.approvalMode) {
         await this.rpc.request('thread/settings/update', { threadId: session.threadId, ...approval });
         session.appliedApprovalMode = task.approvalMode;
@@ -768,7 +778,7 @@ export class Engine extends EventEmitter {
         const created = await this.rpc.request('thread/start', {
           model: this.config.classifier, cwd: this.cwd, ephemeral: true, sandbox: 'read-only', approvalPolicy: 'never',
           baseInstructions: classificationInstructions,
-          config: { 'features.shell_tool': false, 'features.multi_agent': false },
+          config: { 'features.shell_tool': false, 'features.multi_agent': false, web_search: 'disabled' },
         });
         ctx.classifierThread = created.thread.id;
         if (ctx.controller.signal.aborted) throw new Error('已停止');
@@ -788,11 +798,12 @@ export class Engine extends EventEmitter {
       if (!session.threadId) {
         const created = await this.rpc.request('thread/start', {
           model: task.route.model, cwd: this.cwd, sandbox: 'workspace-write', ...approval,
+          config: webSearch,
           dynamicTools: [...this.mcp.dynamicTools(), routingTool],
           developerInstructions: 'Respond in Chinese unless requested otherwise. This is a local model-router client. Use supplied MCP tools only when relevant to the user request. Do not automatically persist task history through an MCP tool. Ask before sensitive or destructive actions. Never read or reveal authentication secrets. Write task files only inside the provided workspace unless the user explicitly approves wider access. Do not spawn subagents unless the user asks. Tool calls can be cancelled; do not automatically repeat a write after interruption.',
         });
         session.routingToolVersion = 1;
-        session.threadId = created.thread.id; session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.mcpServerIds = this.mcp.connectedIds(); session.mcpAttached = session.mcpServerIds.length > 0; session.cwd = this.cwd; this.save();
+        session.threadId = created.thread.id; session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; session.mcpServerIds = this.mcp.connectedIds(); session.mcpAttached = session.mcpServerIds.length > 0; session.cwd = this.cwd; this.save();
       }
       task.escalationAvailable = task.mode === 'auto' && session.routingToolVersion === 1;
       const newlyConnected = this.mcp.connectedIds().filter(id => !(session.mcpServerIds || []).includes(id));
@@ -1084,6 +1095,7 @@ export class Engine extends EventEmitter {
       createdAt: now, updatedAt: now, loaded: true, source: 'router', cwd: session.cwd || this.cwd,
       context: task.usage || null, compaction: { status: 'idle', lastAt: null },
       approvalMode: session.approvalMode || 'approve-for-me', appliedApprovalMode: null,
+      webSearchMode: session.webSearchMode || 'auto', appliedWebSearchMode: session.appliedWebSearchMode || null,
       mcpAttached: session.mcpAttached ?? (this.mcp.connectedIds().length > 0),
       routingToolVersion: session.routingToolVersion,
     };
@@ -1095,7 +1107,7 @@ export class Engine extends EventEmitter {
     const session = this.findSession(id); if (!session?.threadId) throw new Error('这个对话还没有可压缩的原生历史');
     if (session.occupied === true && !session.loaded) throw new Error('该会话仍被另一个 Codex 客户端占用，请刷新会话状态后重试');
     try {
-      if (!session.loaded) { await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, ...approvalSettings(session.approvalMode) }); session.loaded = true; session.appliedApprovalMode = session.approvalMode; this.setOccupancy(session, false); }
+      if (!session.loaded) { await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, config: webSearchSettings(session.webSearchMode), ...approvalSettings(session.approvalMode) }); session.loaded = true; session.appliedApprovalMode = session.approvalMode; session.appliedWebSearchMode = session.webSearchMode; this.setOccupancy(session, false); }
       session.compaction = { status: 'running', lastAt: Date.now() }; this.changed();
       await this.rpc.request('thread/compact/start', { threadId: session.threadId }, 20000);
       return session.compaction;

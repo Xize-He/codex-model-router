@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { Engine, collectFileChanges, approvalSettings, parseRoute, pickRoute, buildRouteCatalog, mapNativeTurn, normalizeRateLimits, normalizeAccount } from '../server/engine.mjs';
+import { Engine, collectFileChanges, approvalSettings, webSearchSettings, parseRoute, pickRoute, buildRouteCatalog, mapNativeTurn, normalizeRateLimits, normalizeAccount } from '../server/engine.mjs';
 import { McpClient, McpRegistry } from '../server/mcp.mjs';
 import { loadRouterConfig, normalizeMcpServers } from '../server/config.mjs';
 import { createPatch } from 'diff';
@@ -41,6 +41,22 @@ test('Approve for me uses Codex auto-review without widening the sandbox', () =>
   assert.deepEqual(approvalSettings('ask'), { approvalPolicy: 'on-request', approvalsReviewer: 'user' });
   assert.deepEqual(approvalSettings('approve-for-me'), { approvalPolicy: 'on-request', approvalsReviewer: 'auto_review' });
 });
+test('web search choices map to Codex native search modes', () => {
+  assert.deepEqual(webSearchSettings('auto'), { web_search: 'cached' });
+  assert.deepEqual(webSearchSettings('enabled'), { web_search: 'live' });
+  assert.deepEqual(webSearchSettings('disabled'), { web_search: 'disabled' });
+  assert.throws(() => webSearchSettings('unknown'), /联网搜索设置无效/);
+});
+test('a conversation keeps the native web search mode selected at creation', () => {
+  const e = engine(), s = e.createSession({ webSearchMode: 'disabled' });
+  s.threadId = 'existing-thread';
+  assert.throws(
+    () => e.submit({ sessionId: s.id, prompt: '搜索最新信息', model: 'small', webSearchMode: 'enabled' }),
+    /新建对话/,
+  );
+  assert.equal(e.active, null);
+  assert.equal(s.webSearchMode, 'disabled');
+});
 test('Approve for me is applied when a router thread is created', async () => {
   const e = engine(), s = e.createSession(), calls = [];
   e.refreshUsage = async () => {}; e.syncNativeHistory = async () => {};
@@ -52,6 +68,7 @@ test('Approve for me is applied when a router thread is created', async () => {
   assert.equal(start.params.sandbox, 'workspace-write');
   assert.equal(start.params.approvalPolicy, 'on-request');
   assert.equal(start.params.approvalsReviewer, 'auto_review');
+  assert.equal(start.params.config.web_search, 'cached');
 });
 test('writer conflicts fail before classification and can retry after release', async () => {
   const e = engine(), s = e.createSession(), calls = [];

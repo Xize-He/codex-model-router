@@ -63,7 +63,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'POST') return json(res, { error: 'Method not allowed' }, 405);
       if (!validToken(req.headers['x-router-token'])) return json(res, { error: '会话令牌无效，请刷新页面' }, 403);
       const input = await body(req);
-      if (url.pathname === '/api/sessions') return json(res, engine.createSession());
+      if (url.pathname === '/api/sessions') return json(res, engine.createSession(input));
       if (url.pathname === '/api/history/refresh') return json(res, await engine.syncNativeHistory());
       if (url.pathname === '/api/history/archived') return json(res, await engine.syncArchivedHistory());
       if (url.pathname === '/api/history/open') return json(res, await engine.loadSessionHistory(input.sessionId));
