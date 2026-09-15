@@ -1325,7 +1325,8 @@ export default function Home() {
             disabled={state?.history.loading || state?.history.occupancyLoading}
           >
             <RefreshCw
-              size={13}
+              size={18}
+              strokeWidth={1.75}
               className={state?.history.loading || state?.history.occupancyLoading ? 'spin' : ''}
             />
           </button>
