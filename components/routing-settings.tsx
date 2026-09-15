@@ -105,17 +105,17 @@ function RoutingModelSelect({
       }}
     >
       <SelectTrigger
-        className="composer-select-trigger routing-config-trigger"
+        className="composer-select-trigger model-select-trigger routing-config-trigger"
         aria-label={label}
         onClick={(event) => event.stopPropagation()}
       >
         <span className="composer-select-value">
-          {selectedModel?.displayName || shortModel(model)} · {effort}
+          {selectedModel?.displayName || shortModel(model)} {effort}
         </span>
       </SelectTrigger>
       {open && (
         <SelectContent
-          className="composer-select-content routing-config-content"
+          className="composer-select-content model-select-content routing-config-content"
           side="bottom"
           align="end"
           alignItemWithTrigger={false}
@@ -140,7 +140,7 @@ function RoutingModelSelect({
                     key={reasoningEffort}
                     value={`${item.model}::${reasoningEffort}`}
                   >
-                    {item.displayName} · {reasoningEffort}
+                    {item.displayName} {reasoningEffort}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -366,9 +366,6 @@ export const RoutingSettings = memo(function RoutingSettings({
           <DialogDescription>
             按任务复杂度选择模型，遇到新的复杂问题时自动升档。
           </DialogDescription>
-          <output className="routing-settings-notice">
-            {routingBusy ? '正在保存…' : '修改后自动保存'}
-          </output>
           {routingError && (
             <p className="inline-error" role="alert">
               {routingError}
@@ -398,7 +395,6 @@ export const RoutingSettings = memo(function RoutingSettings({
           )}
           <div className="routing-list-heading">
             <strong>执行档位</strong>
-            <span>从低到高排列 · 拖拽调整顺序</span>
           </div>
           <div className="routing-tier-list">
             {routingTiers.map((tier, index) => {

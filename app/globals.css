@@ -1218,17 +1218,6 @@ a,
   color: var(--text-secondary);
 }
 
-.routing-config-trigger {
-  max-width: 178px;
-  height: 28px;
-  min-height: 28px;
-  padding: 4px 7px 4px 8px;
-}
-
-.routing-config-content {
-  min-width: 230px;
-}
-
 .routing-tier-list { display: grid; gap: 6px; margin-top: 8px; }
 .routing-tier-card {
   position: relative;
@@ -1462,7 +1451,7 @@ a,
 .routing-settings-header {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   align-items: center;
   gap: 8px 18px;
   padding: 22px 54px 20px 26px;
@@ -1470,21 +1459,17 @@ a,
 }
 .routing-settings-header [data-slot='dialog-title'] { color: var(--text-strong); font-size: 21px; line-height: 1.35; font-weight: 600; }
 .routing-settings-header [data-slot='dialog-description'] { grid-column: 1 / -1; }
-.routing-settings-header .routing-settings-notice { grid-column: 2; grid-row: 1; font-size: 13px; }
 .routing-settings-header .inline-error { grid-column: 1 / -1; margin: 0; }
-.routing-settings-header [data-slot='dialog-description'],
-.routing-settings-notice { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.routing-settings-header [data-slot='dialog-description'] { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
 .routing-settings-dialog .routing-details-content { flex: 1; min-height: 0; padding: 22px 26px 26px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .routing-settings-dialog .routing-details-content > p { margin: 14px 0; color: var(--text-secondary); font-size: 14px; line-height: 1.65; }
 .routing-settings-dialog .classifier-row { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-subtle); font-size: 15px; }
 .routing-settings-dialog .classifier-copy { display: grid; gap: 5px; }
 .routing-settings-dialog .classifier-copy strong { color: var(--text-strong); font-weight: 550; }
 .routing-settings-dialog .classifier-copy small { color: var(--text-secondary); font-size: 13px; }
-.routing-list-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 24px 0 12px; }
+.routing-list-heading { display: flex; align-items: baseline; margin: 24px 0 12px; }
 .routing-list-heading strong { color: var(--text-strong); font-size: 15px; font-weight: 550; }
-.routing-list-heading span { color: var(--text-secondary); font-size: 13px; }
-.routing-settings-dialog .routing-config-trigger { height: 38px; min-height: 38px; max-width: 330px; padding: 8px 10px; font-size: 14px; }
-.routing-settings-dialog .routing-tier-card > summary .routing-config-trigger { flex-basis: 290px; max-width: 48%; }
+.routing-settings-dialog .routing-tier-card > summary .routing-config-trigger { flex: 0 0 auto; max-width: 48%; }
 .routing-settings-dialog .routing-tier-list { gap: 8px; margin: 0; }
 .routing-settings-dialog .routing-tier-card { background: transparent; transition: border-color 120ms ease; }
 .routing-settings-dialog .routing-tier-card[open] { border-color: var(--line-strong); }
@@ -1500,9 +1485,6 @@ a,
 .routing-settings-dialog .routing-tier-actions { padding: 0; }
 .routing-settings-dialog .routing-tier-add { min-height: 44px; font-size: 14px; }
 .routing-settings-open [data-slot='dialog-overlay'] { backdrop-filter: none; -webkit-backdrop-filter: none; animation: none; background: rgb(0 0 0 / 32%); }
-.routing-settings-open .routing-config-content { animation: none; }
-.routing-config-content .composer-select-item { min-height: 38px; font-size: 14px; }
-.routing-config-content [data-slot='select-label'] { font-size: 13px; }
 @media (max-width: 700px) {
   .sidebar-primary-actions .routing-settings-button { justify-content: center; padding: 0; }
   .sidebar-primary-actions .routing-settings-button > span { display: none; }
@@ -1515,7 +1497,5 @@ a,
   .routing-settings-dialog .routing-tier-name { font-size: 14px; padding-inline: 5px; }
   .routing-settings-dialog .routing-tier-editor { padding: 14px; }
   .routing-settings-header { grid-template-columns: 1fr; }
-  .routing-settings-header .routing-settings-notice { grid-column: 1; grid-row: auto; }
-  .routing-list-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   .routing-settings-dialog .classifier-copy small { display: none; }
 }
