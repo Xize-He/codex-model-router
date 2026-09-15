@@ -133,9 +133,9 @@ test('invalid, duplicate, stale, unavailable and image-incompatible upgrades are
     e.models = e.models.filter(model => model.model !== 'expert');
     await reject(request, /不可用/);
     e.models = structuredClone(models);
-    e.config.routes.complex = { model: 'worker', effort: 'low' };
+    e.active.routingConfig.routes.complex = { model: 'worker', effort: 'low' };
     await reject(request, /相同/);
-    e.config.routes.complex = { model: 'expert', effort: 'medium' };
+    e.active.routingConfig.routes.complex = { model: 'expert', effort: 'medium' };
     e.models.find(model => model.model === 'expert').inputModalities = ['text'];
     e.active.task.attachments = [{ kind: 'image' }];
     await reject(request, /图片/); e.active.task.attachments = [];

@@ -253,7 +253,6 @@ export class Engine extends EventEmitter {
       approvals: [...this.approvals.values()].map(a => ({ id: a.id, taskId: a.taskId, kind: a.kind, title: a.title, details: a.details, questions: a.questions })) };
   }
   updateRoutingConfig(input = {}) {
-    if (this.active) throw new Error('任务运行中，暂时不能修改路由配置');
     const next = {
       ...this.config,
       routes: Object.fromEntries(Object.entries(this.config.routes || {}).map(([level, route]) => [level, { ...route }])),
@@ -732,7 +731,8 @@ export class Engine extends EventEmitter {
     if (typeof prompt !== 'string' || prompt.length > 50000) throw new Error('问题不能超过 50000 字符');
     const resolvedAttachments = this.resolveAttachments(attachments);
     if (!prompt.trim() && !resolvedAttachments.length) throw new Error('请输入问题或添加附件');
-    if (model !== 'auto') pickRoute(this.config, this.models, Object.keys(this.config.routes || {})[0], model, effort);
+    const routingConfig = structuredClone(this.config);
+    if (model !== 'auto') pickRoute(routingConfig, this.models, Object.keys(routingConfig.routes || {})[0], model, effort);
     const session = this.findSession(sessionId); if (!session) throw new Error('对话不存在');
     if (!['ask', 'approve-for-me'].includes(approvalMode)) throw new Error('审批方式无效');
     webSearchSettings(webSearchMode);
@@ -744,11 +744,12 @@ export class Engine extends EventEmitter {
       requestedEffort: effort, startedAt: Date.now(), messages: [], events: [], route: null, error: null };
     session.tasks.push(task); if (session.tasks.length === 1) session.title = task.prompt.slice(0, 28);
     session.updatedAt = Date.now();
-    this.active = { task, session, controller: new AbortController(), threadId: null, turnId: null };
+    this.active = { task, session, routingConfig, controller: new AbortController(), threadId: null, turnId: null };
     this.save(); this.run(this.active).catch(() => {}); return task;
   }
   async run(ctx) {
     const { task, session } = ctx;
+    const routingConfig = ctx.routingConfig || this.config;
     try {
       const approval = approvalSettings(task.approvalMode);
       const webSearch = webSearchSettings(task.webSearchMode);
@@ -762,20 +763,20 @@ export class Engine extends EventEmitter {
         session.appliedApprovalMode = task.approvalMode;
       }
       if (ctx.controller.signal.aborted) throw new Error('已停止');
-      const routeCatalog = buildRouteCatalog(this.config, this.models);
+      const routeCatalog = buildRouteCatalog(routingConfig, this.models);
       const routeLevels = routeCatalog.map(route => route.level);
       const tiers = classificationTiers(routeCatalog);
       let classification = { level: routeLevels[Math.floor(routeLevels.length / 2)] || 'standard', reason: '手动指定模型' };
       if (task.mode === 'auto') {
-        const classifier = this.models.find(m => m.model === this.config.classifier);
-        if (!classifier) throw new Error(`分类模型不可用：${this.config.classifier}`);
-        const classifierEffort = this.config.classifierEffort || classifier.defaultReasoningEffort;
+        const classifier = this.models.find(m => m.model === routingConfig.classifier);
+        if (!classifier) throw new Error(`分类模型不可用：${routingConfig.classifier}`);
+        const classifierEffort = routingConfig.classifierEffort || classifier.defaultReasoningEffort;
         if (!classifier.supportedReasoningEfforts.some(option => option.reasoningEffort === classifierEffort)) throw new Error(`${classifier.displayName || classifier.model} 不支持分类强度 ${classifierEffort}`);
         if (routeCatalog.length < 2) throw new Error('自动路由至少需要两个档位');
         const missing = routeCatalog.filter(route => !route.available);
         if (missing.length) throw new Error(`自动路由模型不可用：${missing.map(route => route.model).join('、')}`);
         const created = await this.rpc.request('thread/start', {
-          model: this.config.classifier, cwd: this.cwd, ephemeral: true, sandbox: 'read-only', approvalPolicy: 'never',
+          model: routingConfig.classifier, cwd: this.cwd, ephemeral: true, sandbox: 'read-only', approvalPolicy: 'never',
           baseInstructions: classificationInstructions,
           config: { 'features.shell_tool': false, 'features.multi_agent': false, web_search: 'disabled' },
         });
@@ -783,13 +784,13 @@ export class Engine extends EventEmitter {
         if (ctx.controller.signal.aborted) throw new Error('已停止');
         const context = session.tasks.slice(-5, -1).map(t => ({ user: t.prompt.slice(0, 2000), assistant: t.messages.map(m => m.text).join('\n').slice(-2000) }));
         const text = await this.runTurn(ctx, created.thread.id, {
-          model: this.config.classifier, effort: classifierEffort,
+          model: routingConfig.classifier, effort: classifierEffort,
           input: [{ type: 'text', text: JSON.stringify({ tiers, context, task: task.prompt, attachments: task.attachments.map(item => ({ name: item.name, mime: item.mime, size: item.size })) }) }],
           outputSchema: classificationSchema(routeLevels),
         }, true, 90000);
         classification = parseRoute(text, routeLevels);
       }
-      task.route = { ...classification, ...pickRoute(this.config, this.models, classification.level, task.mode, task.requestedEffort), classifier: task.mode === 'auto' ? `${this.config.classifier} / ${this.config.classifierEffort || 'default'}` : null };
+      task.route = { ...classification, ...pickRoute(routingConfig, this.models, classification.level, task.mode, task.requestedEffort), classifier: task.mode === 'auto' ? `${routingConfig.classifier} / ${routingConfig.classifierEffort || 'default'}` : null };
       const routedModel = this.models.find(item => item.model === task.route.model);
       if (task.attachments.some(item => item.kind === 'image') && routedModel?.inputModalities && !routedModel.inputModalities.includes('image')) throw new Error(`${routedModel.displayName || routedModel.model} 不支持图片输入，请选择支持图片的模型`);
       if (ctx.controller.signal.aborted) throw new Error('已停止');
@@ -976,14 +977,15 @@ export class Engine extends EventEmitter {
         try {
           if (!this.waiters.has(p.threadId)) throw new Error('没有正在执行的模型轮次');
           if (ctx.activeOperations?.size || [...this.approvals.values()].some(item => item.taskId === ctx.task.id)) throw new Error('请等待正在执行的工具和审批结束后再请求升级');
-          const request = validateEscalation({ task: ctx.task, pending: ctx.pendingEscalation, levels: Object.keys(this.config.routes), available: ctx.task.escalationAvailable }, p.arguments);
-          const binding = pickRoute(this.config, this.models, request.targetLevel, 'auto');
+          const routingConfig = ctx.routingConfig || this.config;
+          const request = validateEscalation({ task: ctx.task, pending: ctx.pendingEscalation, levels: Object.keys(routingConfig.routes), available: ctx.task.escalationAvailable }, p.arguments);
+          const binding = pickRoute(routingConfig, this.models, request.targetLevel, 'auto');
           if (binding.model === ctx.task.route.model && binding.effort === ctx.task.route.effort) throw new Error('目标档位与当前模型和强度相同，请选择有效的更高档位');
           const model = this.models.find(item => item.model === binding.model);
           if (ctx.task.attachments?.some(item => item.kind === 'image') && model?.inputModalities && !model.inputModalities.includes('image')) throw new Error('目标模型不支持当前任务的图片输入');
           ctx.pendingEscalation = { ...request, binding };
           ctx.task.status = 'escalating';
-          ctx.task.events.push({ kind: 'routing', label: `请求升档 · ${this.config.routeLabels?.[request.targetLevel] || request.targetLevel}`, at: Date.now() });
+          ctx.task.events.push({ kind: 'routing', label: `请求升档 · ${routingConfig.routeLabels?.[request.targetLevel] || request.targetLevel}`, at: Date.now() });
           this.rpc.respond(m.id, { success: true, contentItems: [{ type: 'inputText', text: 'Upgrade accepted. Stop starting new operations and finish this turn with a handoff now. The higher model will continue in this SAME thread after turn completion. Do not repeat completed side effects.' }] });
         } catch (error) {
           this.rpc.respond(m.id, { success: false, contentItems: [{ type: 'inputText', text: error.message }] });

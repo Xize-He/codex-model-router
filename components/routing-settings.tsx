@@ -49,6 +49,32 @@ type RouteTier = {
 };
 
 const shortModel = (model: string) => model.replace(/^gpt-/i, 'GPT-');
+const modelCapabilityOrder = [
+  /^gpt-6-astra(?:$|-)/i,
+  /^gpt-5\.6-sol(?:$|-)/i,
+  /^gpt-5\.6-terra(?:$|-)/i,
+  /^gpt-5\.6-luna(?:$|-)/i,
+  /^gpt-5\.5(?:$|-)/i,
+  /^gpt-5\.3-codex-spark(?:$|-)/i,
+];
+function sortModelsByCapability(models: Model[]) {
+  return models
+    .map((model, index) => ({
+      model,
+      index,
+      rank: modelCapabilityOrder.findIndex((pattern) =>
+        [model.model, model.displayName].some((value) => pattern.test(value)),
+      ),
+    }))
+    .sort((left, right) => {
+      const leftRank =
+        left.rank < 0 ? modelCapabilityOrder.length : left.rank;
+      const rightRank =
+        right.rank < 0 ? modelCapabilityOrder.length : right.rank;
+      return leftRank - rightRank || left.index - right.index;
+    })
+    .map(({ model }) => model);
+}
 function RoutingModelSelect({
   models,
   model,
@@ -147,7 +173,6 @@ export const RoutingSettings = memo(function RoutingSettings({
       JSON.parse(snapshot) as {
         config?: RoutingConfig;
         models: Model[];
-        activeId: string | null;
       },
     [snapshot],
   );
@@ -190,6 +215,10 @@ export const RoutingSettings = memo(function RoutingSettings({
     state.config?.classifierEffort ||
     classifierModel?.defaultReasoningEffort ||
     '';
+  const sortedModels = useMemo(
+    () => sortModelsByCapability(state.models),
+    [state.models],
+  );
   const routingTiers: RouteTier[] = Object.entries(
     state.config?.routes || {},
   ).map(([level, route]) => ({
@@ -338,11 +367,7 @@ export const RoutingSettings = memo(function RoutingSettings({
             按任务复杂度选择模型，遇到新的复杂问题时自动升档。
           </DialogDescription>
           <output className="routing-settings-notice">
-            {state.activeId
-              ? '任务运行中，配置暂不可修改'
-              : routingBusy
-                ? '正在保存…'
-                : '修改后自动保存'}
+            {routingBusy ? '正在保存…' : '修改后自动保存'}
           </output>
           {routingError && (
             <p className="inline-error" role="alert">
@@ -358,11 +383,10 @@ export const RoutingSettings = memo(function RoutingSettings({
                 <small>负责评估任务，选择合适的档位</small>
               </span>
               <RoutingModelSelect
-                models={state.models}
+                models={sortedModels}
                 model={state.config?.classifier}
                 effort={classifierEffort}
                 label="选择判断模型和推理强度"
-                disabled={!!state.activeId}
                 onChange={(nextModel, nextEffort) =>
                   void updateRoutingConfig('classifier', {
                     classifier: nextModel,
@@ -420,7 +444,7 @@ export const RoutingSettings = memo(function RoutingSettings({
                     <button
                       type="button"
                       className="routing-tier-drag"
-                      draggable={!state?.activeId && !routingBusy}
+                      draggable={!routingBusy}
                       aria-label={`拖动${visibleLabel || tier.label}调整顺序`}
                       title="拖动调整顺序"
                       onClick={(event) => {
@@ -458,7 +482,6 @@ export const RoutingSettings = memo(function RoutingSettings({
                         key={`label-${tier.level}`}
                         defaultValue={tier.label}
                         maxLength={30}
-                        disabled={!!state.activeId}
                         onChange={(event) => {
                           const nextLabel = event.currentTarget.value;
                           setRouteLabelDrafts((current) => ({
@@ -484,11 +507,10 @@ export const RoutingSettings = memo(function RoutingSettings({
                       />
                     </span>
                     <RoutingModelSelect
-                      models={state?.models || []}
+                      models={sortedModels}
                       model={tier.model}
                       effort={tier.effort}
                       label={`选择${visibleLabel || tier.label}使用的模型和推理强度`}
-                      disabled={!!state.activeId}
                       onChange={(nextModel, nextEffort) =>
                         void updateRoutingConfig(tier.level, {
                           level: tier.level,
@@ -506,7 +528,6 @@ export const RoutingSettings = memo(function RoutingSettings({
                         defaultValue={tier.guidance}
                         maxLength={600}
                         rows={3}
-                        disabled={!!state.activeId}
                         onBlur={async (event) => {
                           const input = event.currentTarget,
                             value = input.value;
@@ -532,7 +553,6 @@ export const RoutingSettings = memo(function RoutingSettings({
                         maxLength={600}
                         rows={3}
                         placeholder="哪些新发现需要升档？留空则由模型按任务判断。"
-                        disabled={!!state.activeId}
                         onBlur={async (event) => {
                           const input = event.currentTarget;
                           const value = input.value;
@@ -553,7 +573,6 @@ export const RoutingSettings = memo(function RoutingSettings({
                         aria-label={`删除${visibleLabel || tier.label}`}
                         disabled={
                           routingTiers.length <= 2 ||
-                          !!state?.activeId ||
                           !!routingBusy
                         }
                         onClick={() => removeRoutingTier(index)}
@@ -569,7 +588,7 @@ export const RoutingSettings = memo(function RoutingSettings({
               type="button"
               className="routing-tier-add"
               disabled={
-                routingTiers.length >= 12 || !!state?.activeId || !!routingBusy
+                routingTiers.length >= 12 || !!routingBusy
               }
               onClick={addRoutingTier}
             >

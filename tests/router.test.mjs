@@ -170,6 +170,27 @@ test('routing choices are validated and persisted as local overrides', () => {
     { level: 'safe', label: '安全', guidance: '有效标识', model: 'small', effort: 'low' },
   ] }), /标识无效/);
 });
+test('routing changes save while a task keeps its starting configuration', async () => {
+  const e = engine(), session = e.createSession();
+  let activeContext, releaseRun;
+  const runReleased = new Promise(resolve => { releaseRun = resolve; });
+  e.run = async context => {
+    activeContext = context;
+    await runReleased;
+  };
+  e.submit({ sessionId: session.id, prompt: '执行中的任务', model: 'small' });
+  assert.equal(activeContext.routingConfig.routeLabels?.light, undefined);
+  assert.deepEqual(activeContext.routingConfig.routes.light, { model: 'small', effort: 'low' });
+
+  e.updateRoutingConfig({ level: 'light', label: '下一次任务', model: 'big', effort: 'medium' });
+  assert.equal(e.config.routeLabels.light, '下一次任务');
+  assert.deepEqual(e.config.routes.light, { model: 'big', effort: 'medium' });
+  assert.equal(activeContext.routingConfig.routeLabels?.light, undefined);
+  assert.deepEqual(activeContext.routingConfig.routes.light, { model: 'small', effort: 'low' });
+
+  e.active = null;
+  releaseRun();
+});
 test('default automatic routing uses the agreed L0-L4 model and effort profiles', () => {
   assert.equal(routerConfig.classifier, 'gpt-5.6-sol');
   assert.equal(routerConfig.classifierEffort, 'medium');

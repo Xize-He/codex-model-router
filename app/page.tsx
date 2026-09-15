@@ -788,7 +788,10 @@ export default function Home() {
   const primaryLimit =
     state?.usage.limits.find((item) => item.id === 'codex') ||
     state?.usage.limits[0];
-  const routingSnapshot = JSON.stringify({ config: state?.config, models: state?.models || [], activeId: state?.activeId || null });
+  const routingSnapshot = JSON.stringify({
+    config: state?.config,
+    models: state?.models || [],
+  });
   const onRoutingSaved = useCallback((config: RoutingConfig) => {
     setState((current) => current ? { ...current, config } : current);
   }, []);
