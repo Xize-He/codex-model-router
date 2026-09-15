@@ -1371,15 +1371,15 @@ export default function Home() {
             </SelectContent>
           </Select>
           <Select value={activeWebSearchMode} onValueChange={(value) => value && setWebSearchMode(value as 'auto' | 'enabled' | 'disabled')}>
-            <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title="保存为默认设置；当前对话从下一条消息开始使用">
+            <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title="非实时搜索使用 OpenAI 网页索引；设置从下一条消息开始使用">
               <Globe2 className="sidebar-action-icon" size={18} strokeWidth={1.75} />
               <span className="sidebar-preference-label">联网搜索</span>
-              <span className="sidebar-preference-value">{{ auto: '默认（缓存）', enabled: '开启', disabled: '关闭' }[activeWebSearchMode]}</span>
+              <span className="sidebar-preference-value">{{ auto: '非实时搜索', enabled: '实时搜索', disabled: '关闭搜索' }[activeWebSearchMode]}</span>
             </SelectTrigger>
             <SelectContent className="composer-select-content" align="start" alignItemWithTrigger={false}>
-              <SelectItem className="composer-select-item" value="auto">默认（缓存）</SelectItem>
-              <SelectItem className="composer-select-item" value="enabled">开启</SelectItem>
-              <SelectItem className="composer-select-item" value="disabled">关闭</SelectItem>
+              <SelectItem className="composer-select-item" value="auto">非实时搜索</SelectItem>
+              <SelectItem className="composer-select-item" value="enabled">实时搜索</SelectItem>
+              <SelectItem className="composer-select-item" value="disabled">关闭搜索</SelectItem>
             </SelectContent>
           </Select>
         </div>
