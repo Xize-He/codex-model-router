@@ -346,6 +346,24 @@ const accountInitial = (name?: string | null) =>
   Array.from((name || 'C').trim())[0]?.toUpperCase() || 'C';
 const isFinished = (s: string) =>
   ['completed', 'failed', 'interrupted'].includes(s);
+const conversationTimestamp = (timestamp: number, now = Date.now()) => {
+  const date = new Date(timestamp);
+  const current = new Date(now);
+  const time = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const isToday =
+    date.getFullYear() === current.getFullYear() &&
+    date.getMonth() === current.getMonth() &&
+    date.getDate() === current.getDate();
+  if (isToday) return time;
+  return `${date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  })} ${time}`;
+};
 const workedFor = (startedAt: number, endedAt?: number) => {
   const totalSeconds = Math.max(
     1,
@@ -1773,10 +1791,7 @@ export default function Home() {
                     <small>
                       {item.archived
                         ? '已归档'
-                        : new Date(item.updatedAt || item.createdAt).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                        : conversationTimestamp(item.updatedAt || item.createdAt)}
                     </small>
                   </button>
                 ))}
@@ -1936,7 +1951,7 @@ export default function Home() {
                 </div>
                 <div className="user-message-meta" aria-label="消息操作">
                   <time dateTime={new Date(task.startedAt).toISOString()}>
-                    {new Date(task.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    {conversationTimestamp(task.startedAt)}
                   </time>
                   <button type="button" aria-label="复制消息" title="复制消息" onClick={() => void copyUserMessage(task)}>
                     {copiedTask === `user:${task.id}` ? <Check size={14} /> : <Copy size={14} />}
