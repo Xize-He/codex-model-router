@@ -57,6 +57,8 @@ import {
   PanelLeftOpen,
   MessageCirclePlus,
   GitFork,
+  Rows3,
+  PanelsTopLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -1313,6 +1315,28 @@ export default function Home() {
             <GitFork className="sidebar-action-icon" size={18} strokeWidth={1.75} />
             <span>模型路由配置</span>
           </Button>
+          <Select value={theme} onValueChange={(value) => value && setTheme(value as 'light' | 'dark')}>
+            <SelectTrigger className="sidebar-preference-button" aria-label="选择页面风格">
+              {theme === 'dark' ? <Moon className="sidebar-action-icon" size={18} strokeWidth={1.75} /> : <Sun className="sidebar-action-icon" size={18} strokeWidth={1.75} />}
+              <span className="sidebar-preference-label">颜色风格</span>
+              <span className="sidebar-preference-value">{theme === 'dark' ? '暗夜' : '浅色'}</span>
+            </SelectTrigger>
+            <SelectContent className="composer-select-content" align="start" alignItemWithTrigger={false}>
+              <SelectItem className="composer-select-item" value="light"><Sun size={14} />浅色</SelectItem>
+              <SelectItem className="composer-select-item" value="dark"><Moon size={14} />暗夜</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={conversationMode} onValueChange={(value) => value && setConversationMode(value as 'flow' | 'cards')}>
+            <SelectTrigger className="sidebar-preference-button" aria-label="选择会话排列方式">
+              {conversationMode === 'flow' ? <Rows3 className="sidebar-action-icon" size={18} strokeWidth={1.75} /> : <PanelsTopLeft className="sidebar-action-icon" size={18} strokeWidth={1.75} />}
+              <span className="sidebar-preference-label">会话排列</span>
+              <span className="sidebar-preference-value">{conversationMode === 'flow' ? '纵向' : '卡片'}</span>
+            </SelectTrigger>
+            <SelectContent className="composer-select-content" align="start" alignItemWithTrigger={false}>
+              <SelectItem className="composer-select-item" value="flow"><Rows3 size={14} />纵向</SelectItem>
+              <SelectItem className="composer-select-item" value="cards"><PanelsTopLeft size={14} />卡片</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="sidebar-label">
           <span>
@@ -1631,57 +1655,6 @@ export default function Home() {
             )}
           </div>
           <div className="header-actions">
-            <div className="theme-picker" title="页面风格">
-              <Select
-                value={theme}
-                onValueChange={(value) => value && setTheme(value as 'light' | 'dark')}
-              >
-                <SelectTrigger
-                  className="composer-select-trigger theme-select-trigger"
-                  aria-label="选择页面风格"
-                >
-                  {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
-                  <span>{theme === 'dark' ? '暗夜' : '浅色'}</span>
-                </SelectTrigger>
-                <SelectContent
-                  className="composer-select-content theme-select-content"
-                  side="bottom"
-                  align="end"
-                  alignItemWithTrigger={false}
-                >
-                  <SelectItem className="composer-select-item" value="light">
-                    <Sun size={14} />浅色
-                  </SelectItem>
-                  <SelectItem className="composer-select-item" value="dark">
-                    <Moon size={14} />暗夜
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="conversation-view-toggle" role="group" aria-label="会话显示方式">
-              <button
-                type="button"
-                className={conversationMode === 'flow' ? 'selected' : ''}
-                aria-label="纵向"
-                aria-pressed={conversationMode === 'flow'}
-                title="纵向连续显示"
-                onClick={() => setConversationMode('flow')}
-              >
-                <span className="view-label-full">纵向</span>
-                <span className="view-label-short" aria-hidden="true">纵</span>
-              </button>
-              <button
-                type="button"
-                className={conversationMode === 'cards' ? 'selected' : ''}
-                aria-label="卡片"
-                aria-pressed={conversationMode === 'cards'}
-                title="按问答轮次横向切换"
-                onClick={() => setConversationMode('cards')}
-              >
-                <span className="view-label-full">卡片</span>
-                <span className="view-label-short" aria-hidden="true">卡</span>
-              </button>
-            </div>
             <Button
               variant="ghost"
               size="icon"

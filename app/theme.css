@@ -13,6 +13,17 @@
 .sidebar-primary-actions :is(.new-chat, .routing-settings-button) { gap: 10px; }
 .sidebar-primary-actions .sidebar-action-icon { width: 18px; height: 18px; flex: 0 0 18px; color: var(--text-secondary); }
 .sidebar-primary-actions button:hover:not(:disabled) .sidebar-action-icon { color: var(--text-strong); }
+.sidebar-primary-actions .sidebar-preference-button { display: flex; justify-content: flex-start; width: 100%; height: 38px; gap: 10px; padding: 0 11px; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500; box-shadow: none; }
+.sidebar-primary-actions .sidebar-preference-button:hover,
+.sidebar-primary-actions .sidebar-preference-button[data-popup-open] { background: var(--surface-hover); color: var(--text-strong); }
+.sidebar-preference-label { flex: 1; text-align: left; }
+.sidebar-preference-value { color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.sidebar-primary-actions .sidebar-preference-button .sidebar-action-icon { width: 18px; height: 18px; }
+@media (max-width: 700px) {
+  .sidebar-primary-actions .sidebar-preference-button { justify-content: center; padding: 0; }
+  .sidebar-preference-button :is(.sidebar-preference-label, .sidebar-preference-value),
+  .sidebar-preference-button > svg:last-child { display: none; }
+}
 .sidebar-expand { flex: 0 0 32px; margin-right: 9px; }
 .sidebar-collapsed .sidebar { width: 0; min-width: 0; padding-right: 0; padding-left: 0; border-right-color: transparent; overflow: hidden; }
 .sidebar-collapsed .sidebar > * { visibility: hidden; opacity: 0; pointer-events: none; }
