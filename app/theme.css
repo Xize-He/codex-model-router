@@ -7,14 +7,14 @@
 .session-kind-options > button:hover:not(:disabled), .session-kind-options > button:focus-visible { background: var(--surface-hover); border-color: var(--text-muted); }
 .session-kind-options > button:focus-visible { outline: 2px solid var(--text-secondary); outline-offset: 2px; }
 .session-kind-options > button:disabled { cursor: wait; }
-.session-kind-options > button > span { display: grid; gap: 5px; }
+.session-kind-option-copy { display: grid; flex: 1; gap: 5px; }
 .session-kind-options strong { font-size: 15px; font-weight: 600; }
 .session-kind-options small { color: var(--text-secondary); font-size: 13px; }
 .session-kind-check { opacity: 0; flex-shrink: 0; }
 .session-kind-options > button:hover .session-kind-check, .session-kind-options > button:focus-visible .session-kind-check { opacity: 1; }
-.session-copy .session-title-line { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.session-title-line > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-kind-badge, .sidebar .session-copy .session-kind-badge { display: inline-flex; flex-shrink: 0; align-items: center; margin: 0; padding: 2px 6px; border-radius: 5px; background: var(--surface-hover); color: var(--text-secondary); font-size: 12px; font-weight: 400; line-height: 1.25; white-space: nowrap; }
+.session-title-line, .session-copy .session-title-line { display: flex; flex-direction: row; align-items: center; min-width: 0; gap: 7px; }
+.session-title-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-kind-icon { display: inline-flex; flex: 0 0 16px; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; color: var(--text-secondary); vertical-align: middle; }
 .header-session-kind { margin-left: 8px; }
 .sidebar { padding-top: 20px; transition: width 180ms ease, padding 180ms ease, border-color 180ms ease; }
 .sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px 18px 8px; }

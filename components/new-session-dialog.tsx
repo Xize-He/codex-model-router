@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, LoaderCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { sessionKindLabels } from '@/lib/session-kind.mjs';
+import { SessionKindIcon } from '@/components/session-kind-icon';
 
 export type SessionKind = keyof typeof sessionKindLabels;
 const descriptions: Record<SessionKind, string> = {
@@ -31,7 +32,8 @@ export function NewSessionDialog({ cwd, onClose, onCreate }: {
       </DialogHeader>
       <div className="session-kind-options">
         {(Object.keys(sessionKindLabels) as SessionKind[]).map(kind => <button type="button" key={kind} disabled={!!creating} onClick={() => void create(kind)}>
-          <span><strong>{sessionKindLabels[kind]}</strong><small>{descriptions[kind]}</small></span>
+          <SessionKindIcon kind={kind} />
+          <span className="session-kind-option-copy"><strong>{sessionKindLabels[kind]}</strong><small>{descriptions[kind]}</small></span>
           {creating === kind ? <LoaderCircle className="spin" size={17} /> : <Check className="session-kind-check" size={17} />}
         </button>)}
       </div>

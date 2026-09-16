@@ -78,7 +78,8 @@ import { MarkdownAnswer } from '@/components/markdown-answer';
 import { FileBrowser } from '@/components/file-browser';
 import { DeepseekSettings } from '@/components/deepseek-settings';
 import { NewSessionDialog, type SessionKind } from '@/components/new-session-dialog';
-import { sessionKind, sessionKindLabels, sessionAllowsModel, defaultSessionModel } from '@/lib/session-kind.mjs';
+import { SessionKindIcon } from '@/components/session-kind-icon';
+import { sessionKind, sessionAllowsModel, defaultSessionModel } from '@/lib/session-kind.mjs';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -354,7 +355,6 @@ const accountTypeText: Record<string, string> = {
   agentIdentity: 'Agent Identity',
 };
 const shortModel = (m = '') => m.startsWith('deepseek') ? 'DeepSeek Flash' : m.replace('gpt-', 'GPT-');
-const sessionLabel = (session: Session) => sessionKindLabels[sessionKind(session) as SessionKind];
 const modelLabel = (model: Model) => model.model.startsWith('deepseek') ? 'DeepSeek Flash' : model.displayName;
 const normalizeWorkspacePath = (cwd: string) => {
   const normalized = cwd.trim().replace(/\\/g, '/').replace(/\/+$/, '');
@@ -1425,7 +1425,7 @@ export default function Home() {
           }}
         >
           <span className="session-copy">
-            <span className="session-title-line"><span>{item.title}</span><small className="session-kind-badge">{sessionLabel(item)}</small></span>
+            <span className="session-title-line"><span className="session-title-text">{item.title}</span><SessionKindIcon kind={sessionKind(item) as SessionKind} /></span>
             {(item.occupancyChecking || item.occupied) && (
               <small>
                 {item.occupancyChecking ? (
@@ -2001,7 +2001,7 @@ export default function Home() {
               </Button>
             )}
             {session?.title || '新对话'}
-            {session && <span className="session-kind-badge header-session-kind">{sessionLabel(session)}</span>}
+            {session && <SessionKindIcon kind={sessionKind(session) as SessionKind} className="header-session-kind" />}
             <span className="version">V3</span>
             {session?.occupied && (
               <span className="source-chip occupied-chip" title="该会话正由 Codex 桌面版或其他客户端持有">
@@ -2070,7 +2070,7 @@ export default function Home() {
                     className={item.id === selected ? 'selected' : ''}
                     onClick={() => chooseSearchResult(item)}
                   >
-                    <span>{item.title} <span className="session-kind-badge">{sessionLabel(item)}</span></span>
+                    <span className="session-title-line"><span className="session-title-text">{item.title}</span><SessionKindIcon kind={sessionKind(item) as SessionKind} /></span>
                     <small>
                       {item.archived
                         ? '已归档'
