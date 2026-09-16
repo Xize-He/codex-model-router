@@ -29,6 +29,18 @@ MCP 服务由使用者自行启动，和网页分别管理。关闭浏览器或 
 
 ## 默认连接与路由
 
+### 可选 DeepSeek 模型
+
+手动模型列表支持 **DeepSeek V4.1 Flash**（`deepseek-flash`），推理强度为 low / high / max。打开右侧「状态 → DeepSeek」，输入自己的 API Key 并点击连接，然后新建对话选择该模型。此选项不参与自动分类和档位配置。
+
+页面输入的密钥仅保存在服务进程内存中，关闭服务后需要重新输入；也可以在启动服务前设置本机 `DEEPSEEK_API_KEY` 环境变量。密钥不会写入路由配置、会话历史或发送回浏览器。不要把真实密钥提交到仓库。
+
+DeepSeek API 独立计费，不使用 ChatGPT 套餐额度；账户用量面板仍展示 Codex 账户额度。现有 Codex 登录保留，本版仍需要已登录的 Codex 运行环境。DeepSeek 通过 Codex 自定义 Responses 提供商执行工具和维护历史，额外权限由用户审批，原生网页搜索关闭。已有会话绑定原提供商，跨提供商使用请新建对话。
+
+接口依据：[DeepSeek Responses API 文档](https://api-docs.deepseek.com/guides/responses_api/)。模型列表检测只验证密钥和模型可用性，实际生成仍受提供商余额与服务状态影响。
+
+### 默认配置
+
 - MCP：公开配置默认不连接任何服务。复制 `router.config.local.example.json` 为 `router.config.local.json`，在 `mcpServers` 中配置任意数量的服务。该本机文件已被 Git 忽略。
 - MCP 认证：每个服务可指定自己的 `tokenEnv`。启动脚本也支持当前 Windows 用户加密的多服务认证缓存，不在网页或源码中保存明文密钥。
 - 判断难度：`gpt-5.6-sol`，medium。该模型使用 Codex 主额度，适合判断模糊、多步骤及需要权衡的任务。

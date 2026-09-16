@@ -106,6 +106,7 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/account/logout') return json(res, await engine.logoutAccount());
       if (url.pathname === '/api/usage/refresh') return json(res, await engine.refreshUsage());
       if (url.pathname === '/api/config/routing') return json(res, engine.updateRoutingConfig(input));
+      if (url.pathname === '/api/providers/deepseek') return json(res, await engine.configureDeepseek(input));
       if (url.pathname === '/api/answer') { engine.answer(input.id, { approved: input.approved === true, answers: input.answers }); return json(res, { ok: true }); }
       if (url.pathname === '/api/mcp/reconnect') return json(res, await engine.connectMcp());
       if (url.pathname === '/api/shutdown') { json(res, { ok: true }); setImmediate(shutdown); return; }

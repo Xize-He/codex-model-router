@@ -3,18 +3,19 @@ import { createInterface } from 'node:readline';
 import { EventEmitter } from 'node:events';
 
 export class CodexRPC extends EventEmitter {
-  constructor({ bin = process.env.ROUTER_CODEX_BIN || 'codex', args = [], secretEnv = [] } = {}) {
+  constructor({ bin = process.env.ROUTER_CODEX_BIN || 'codex', args = [], secretEnv = [], providerEnv = {} } = {}) {
     super(); this.seq = 0; this.pending = new Map(); this.closed = false; this.stderr = '';
     const pluginNames = ['codex-app-tools','visualize','sites','browser','unified-computer-use'];
     const plugins = pluginNames.flatMap(name => ['-c', `plugins."${name}@openai-bundled".enabled=false`]);
     // Do not attach this independent client to the parent desktop task's IPC bridge.
-    const env = { ...process.env };
+    const env = { ...process.env, ...providerEnv };
     for (const key of ['CODEX_APP_TOOLS_PIPE_PATH', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE', 'CODEX_SESSION_ID', 'CODEX_THREAD_ID']) delete env[key];
     for (const key of Object.keys(env)) if (secretEnv.some(name => name.toLowerCase() === key.toLowerCase())) delete env[key];
     this.child = spawn(bin, ['app-server', '--stdio',
       '-c', 'features.apps=false', '-c', 'mcp_servers.node_repl.enabled=false',
       '-c', 'mcp_servers.company_memory.enabled=false',
       '-c', 'features.respect_system_proxy=true',
+      '-c', 'shell_environment_policy.exclude=["*KEY*","*TOKEN*","*SECRET*"]',
       '-c', 'features.computer_use=false', '-c', 'features.browser_use=false', '-c', 'features.in_app_browser=false',
       ...plugins, ...args], { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     createInterface({ input: this.child.stdout }).on('line', line => {

@@ -76,6 +76,7 @@ import {
 } from '@/components/ui/select';
 import { MarkdownAnswer } from '@/components/markdown-answer';
 import { FileBrowser } from '@/components/file-browser';
+import { DeepseekSettings } from '@/components/deepseek-settings';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -166,6 +167,7 @@ type Session = {
   updatedAt?: number;
   cwd?: string;
   model?: string | null;
+  modelProvider?: string;
   historyLoaded?: boolean;
   historyLoading?: boolean;
   historyError?: string;
@@ -277,7 +279,8 @@ type State = {
   error?: string;
   activeId?: string;
   cwd: string;
-  models: Model[];
+  models: (Model & { manualOnly?: boolean })[];
+  deepseek?: { configured: boolean; checkedAt: number | null; updating: boolean };
   sessions: Session[];
   approvals: Approval[];
   account: AccountState;
@@ -795,7 +798,9 @@ export default function Home() {
   const session = state?.sessions.find((s) => s.id === selected),
     tasks = session?.tasks || [],
     last = tasks.at(-1);
-  const activeWebSearchMode = webSearchMode;
+  const usingDeepseek = model === 'deepseek-flash';
+  const activeWebSearchMode = usingDeepseek ? 'disabled' : webSearchMode;
+  const activeApprovalMode = usingDeepseek ? 'ask' : approvalMode;
   const activeTaskIsSelected = Boolean(
     state?.activeId && tasks.some((task) => task.id === state.activeId),
   );
@@ -847,7 +852,7 @@ export default function Home() {
     state?.usage.limits[0];
   const routingSnapshot = JSON.stringify({
     config: state?.config,
-    models: state?.models || [],
+    models: state?.models.filter(item => !item.manualOnly) || [],
   });
   const onRoutingSaved = useCallback((config: RoutingConfig) => {
     setState((current) => current ? { ...current, config } : current);
@@ -928,6 +933,9 @@ export default function Home() {
   }
   useEffect(() => {
     setApprovalMode('approve-for-me');
+    if (session?.modelProvider === 'router_deepseek' || session?.model === 'deepseek-flash') {
+      setModel('deepseek-flash'); setEffort('auto');
+    } else if (session?.threadId) setModel(current => current === 'deepseek-flash' ? 'auto' : current);
   }, [session?.id]);
   useEffect(() => {
     if (!sessionMenu && !projectMenu) return;
@@ -1068,7 +1076,7 @@ export default function Home() {
         attachments: attachments.map(({ id }) => ({ id })),
         model,
         effort,
-        approvalMode,
+        approvalMode: activeApprovalMode,
         webSearchMode: activeWebSearchMode,
       });
       setDraft('');
@@ -1568,7 +1576,7 @@ export default function Home() {
               <SelectItem className="composer-select-item" value="cards"><PanelsTopLeft size={14} />卡片</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={activeWebSearchMode} onValueChange={(value) => value && setWebSearchMode(value as 'auto' | 'enabled' | 'disabled')}>
+          <Select disabled={usingDeepseek} value={activeWebSearchMode} onValueChange={(value) => value && setWebSearchMode(value as 'auto' | 'enabled' | 'disabled')}>
             <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title="非实时搜索使用 OpenAI 网页索引；设置从下一条消息开始使用">
               <Globe2 className="sidebar-action-icon" size={18} strokeWidth={1.75} />
               <span className="sidebar-preference-label">联网搜索</span>
@@ -2476,7 +2484,8 @@ export default function Home() {
                   title="替我审批会让 Codex 自动审查工作区外的额外权限请求；不会扩大工作区或网络边界。"
                 >
                   <Select
-                    value={approvalMode}
+                    disabled={usingDeepseek}
+                    value={activeApprovalMode}
                     onValueChange={(value) =>
                       value &&
                       setApprovalMode(
@@ -2488,7 +2497,7 @@ export default function Home() {
                       className="composer-select-trigger approval-select-trigger"
                       aria-label="选择审批方式"
                     >
-                      <span>{approvalMode === 'approve-for-me' ? 'Approve for me' : 'Ask for approval'}</span>
+                      <span>{activeApprovalMode === 'approve-for-me' ? 'Approve for me' : 'Ask for approval'}</span>
                     </SelectTrigger>
                     <SelectContent
                       className="composer-select-content"
@@ -2664,6 +2673,7 @@ export default function Home() {
           </div>
           {rightPanel === 'files' && <FileBrowser key={selected} sessionId={selected} cwd={session?.cwd || state?.cwd} requestedPath={requestedFile.sessionId === selected ? requestedFile.path : ''} />}
           <div hidden={rightPanel !== 'status'}>
+          <DeepseekSettings configured={!!state?.deepseek?.configured} checkedAt={state?.deepseek?.checkedAt} disabled={!!state?.activeId || !!state?.deepseek?.updating} />
           <section>
             <details
               className="inspector-details"
