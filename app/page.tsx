@@ -1591,8 +1591,8 @@ export default function Home() {
                         }))
                       }
                     >
-                      <ChevronRight className="session-group-chevron" size={15} strokeWidth={1.75} />
                       <span id="projects-heading">Projects</span>
+                      <ChevronRight className="session-group-chevron" size={15} strokeWidth={1.75} />
                     </button>
                     <button
                       type="button"
@@ -1726,8 +1726,8 @@ export default function Home() {
                         }))
                       }
                     >
-                      <ChevronRight className="session-group-chevron" size={15} strokeWidth={1.75} />
                       <span id="recents-heading">Recents</span>
+                      <ChevronRight className="session-group-chevron" size={15} strokeWidth={1.75} />
                     </button>
                   </div>
                   {!collapsedSessionGroups.recents && (
