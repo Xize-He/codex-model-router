@@ -135,6 +135,7 @@ type Task = {
   }[];
   native?: boolean;
   prompt: string;
+  mode?: string;
   attachments?: Attachment[];
   status: string;
   route?: {
@@ -2244,14 +2245,16 @@ export default function Home() {
                           <ChevronRight className="route-chevron" size={14} />
                         </summary>
                         <div className="route-reason">
-                          <span>
-                            {state?.config.routeLabels?.[task.route.level] || levelText[task.route.level] || task.route.level}
-                          </span>
-                          <p>{task.route.reason}</p>
-                          {task.route.confidence !== undefined && (
+                          {task.route.classifier ? <>
+                            <span>
+                              {state?.config.routeLabels?.[task.route.level] || levelText[task.route.level] || task.route.level}
+                            </span>
+                            <p>{task.route.reason}</p>
+                          </> : <span>手动指定模型</span>}
+                          {!!task.route.classifier && task.route.confidence !== undefined && (
                             <p className="route-meta">{task.route.taskType ? `${task.route.taskType} · ` : ''}初始判断信心 {task.route.confidence}%（模型估计）</p>
                           )}
-                          {!!task.route.escalation && !task.routeHistory?.length && (
+                          {!!task.route.classifier && !!task.route.escalation && !task.routeHistory?.length && (
                             <div className="route-escalation">
                               <span>升级条件 · {state?.config.routeLabels?.[task.route.escalation.targetLevel] || task.route.escalation.targetLevel}</span>
                               <ul>{task.route.escalation.signals.map((signal, index) => <li key={index}>{signal}</li>)}</ul>
