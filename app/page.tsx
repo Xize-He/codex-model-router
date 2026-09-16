@@ -989,12 +989,19 @@ export default function Home() {
       setUploading(false);
     }
   }
-  async function create() {
+  async function create(cwd?: string) {
     setBusy(true);
     try {
-      const s = await post<{ id: string }>('sessions', { webSearchMode });
+      const s = await post<{ id: string }>('sessions', {
+        webSearchMode,
+        ...(cwd ? { cwd } : {}),
+      });
       sessionViewRef.current = 'active';
       setSessionView('active');
+      if (cwd) {
+        const projectKey = normalizeWorkspacePath(cwd);
+        setOpenProjects((current) => ({ ...current, [projectKey]: true }));
+      }
       setSelected(s.id);
       setDraft('');
       setAttachments([]);
@@ -1573,7 +1580,9 @@ export default function Home() {
                             );
                           }}
                         >
-                          <summary title={project.cwd}>
+                          <summary
+                            title={`项目工作目录：${project.cwd}`}
+                          >
                             <ChevronRight
                               className="sidebar-project-chevron"
                               size={14}
@@ -1586,6 +1595,24 @@ export default function Home() {
                             />
                             <span>{project.name}</span>
                           </summary>
+                          <span className="sidebar-project-info" role="tooltip">
+                            <span>工作目录</span>
+                            <code>{project.cwd}</code>
+                          </span>
+                          <div className="sidebar-project-actions">
+                            <button
+                              type="button"
+                              aria-label={`在 ${project.name} 中新建会话`}
+                              title="在此项目中新建会话"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                void create(project.cwd);
+                              }}
+                            >
+                              <MessageCirclePlus size={15} strokeWidth={1.75} />
+                            </button>
+                          </div>
                           <div className="sidebar-project-sessions">
                             {project.sessions.map(renderSessionRow)}
                           </div>

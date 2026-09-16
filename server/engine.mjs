@@ -641,9 +641,11 @@ export class Engine extends EventEmitter {
     this.mcpStatuses = await this.mcp.connectAll();
     this.changed(); return this.mcpStatuses;
   }
-  createSession({ webSearchMode = 'auto' } = {}) {
+  createSession({ webSearchMode = 'auto', cwd } = {}) {
     webSearchSettings(webSearchMode);
-    const session = { id: randomUUID(), title: '新对话', threadId: null, tasks: [], createdAt: Date.now(), updatedAt: Date.now(), loaded: false, source: 'router', context: null, compaction: { status: 'idle', lastAt: null }, approvalMode: 'approve-for-me', appliedApprovalMode: null, webSearchMode, appliedWebSearchMode: null };
+    const projectCwd = typeof cwd === 'string' ? cwd.trim() : '';
+    if (projectCwd.includes('\0')) throw new Error('项目工作目录无效');
+    const session = { id: randomUUID(), title: '新对话', threadId: null, tasks: [], createdAt: Date.now(), updatedAt: Date.now(), loaded: false, source: 'router', context: null, compaction: { status: 'idle', lastAt: null }, approvalMode: 'approve-for-me', appliedApprovalMode: null, webSearchMode, appliedWebSearchMode: null, ...(projectCwd ? { cwd: projectCwd } : {}) };
     this.sessions.unshift(session); this.save(); return session;
   }
   async archiveSession({ sessionId }) {
@@ -749,6 +751,7 @@ export class Engine extends EventEmitter {
   }
   async run(ctx) {
     const { task, session } = ctx;
+    const sessionCwd = session.cwd || this.cwd;
     const routingConfig = ctx.routingConfig || this.config;
     try {
       const approval = approvalSettings(task.approvalMode);
@@ -776,7 +779,7 @@ export class Engine extends EventEmitter {
         const missing = routeCatalog.filter(route => !route.available);
         if (missing.length) throw new Error(`自动路由模型不可用：${missing.map(route => route.model).join('、')}`);
         const created = await this.rpc.request('thread/start', {
-          model: routingConfig.classifier, cwd: this.cwd, ephemeral: true, sandbox: 'read-only', approvalPolicy: 'never',
+          model: routingConfig.classifier, cwd: sessionCwd, ephemeral: true, sandbox: 'read-only', approvalPolicy: 'never',
           baseInstructions: classificationInstructions,
           config: { 'features.shell_tool': false, 'features.multi_agent': false, web_search: 'disabled' },
         });
@@ -797,13 +800,13 @@ export class Engine extends EventEmitter {
       task.status = 'starting'; this.changed();
       if (!session.threadId) {
         const created = await this.rpc.request('thread/start', {
-          model: task.route.model, cwd: this.cwd, sandbox: 'workspace-write', ...approval,
+          model: task.route.model, cwd: sessionCwd, sandbox: 'workspace-write', ...approval,
           config: webSearch,
           dynamicTools: [...this.mcp.dynamicTools(), routingTool],
-          developerInstructions: 'Respond in Chinese unless requested otherwise. This is a local model-router client. Use supplied MCP tools only when relevant to the user request. Do not automatically persist task history through an MCP tool. Ask before sensitive or destructive actions. Never read or reveal authentication secrets. Write task files only inside the provided workspace unless the user explicitly approves wider access. Do not spawn subagents unless the user asks. Tool calls can be cancelled; do not automatically repeat a write after interruption.',
+          developerInstructions: 'Respond in Chinese unless requested otherwise. This is a local model-router client. Use supplied MCP tools only when relevant to the user request. Do not automatically persist task history through an MCP tool. Ask before sensitive or destructive actions. Never read or reveal authentication secrets. Write task files only inside the active project working directory unless the user explicitly approves wider access. Do not spawn subagents unless the user asks. Tool calls can be cancelled; do not automatically repeat a write after interruption.',
         });
         session.routingToolVersion = 1;
-        session.threadId = created.thread.id; session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; session.mcpServerIds = this.mcp.connectedIds(); session.mcpAttached = session.mcpServerIds.length > 0; session.cwd = this.cwd; this.save();
+        session.threadId = created.thread.id; session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; session.mcpServerIds = this.mcp.connectedIds(); session.mcpAttached = session.mcpServerIds.length > 0; session.cwd = sessionCwd; this.save();
       }
       task.escalationAvailable = task.mode === 'auto' && session.routingToolVersion === 1;
       const newlyConnected = this.mcp.connectedIds().filter(id => !(session.mcpServerIds || []).includes(id));

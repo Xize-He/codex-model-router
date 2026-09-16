@@ -77,6 +77,22 @@ test('Approve for me is applied when a router thread is created', async () => {
   assert.equal(start.params.approvalsReviewer, 'auto_review');
   assert.equal(start.params.config.web_search, 'cached');
 });
+test('a project conversation starts in the selected project working directory', async () => {
+  const e = engine(), cwd = path.join(e.root, 'project'), calls = [];
+  mkdirSync(cwd);
+  const s = e.createSession({ cwd });
+  e.refreshUsage = async () => {}; e.syncNativeHistory = async () => {};
+  e.rpc = { request: async (method, params) => {
+    calls.push({ method, params });
+    return method === 'thread/start' ? { thread: { id: 'project-thread' } } : {};
+  } };
+  e.runTurn = async () => '';
+  e.submit({ sessionId: s.id, prompt: '在当前项目处理问题', model: 'small' });
+  await new Promise(resolve => setImmediate(resolve));
+  const start = calls.find(call => call.method === 'thread/start');
+  assert.equal(start.params.cwd, cwd);
+  assert.equal(s.cwd, cwd);
+});
 test('writer conflicts fail before classification and can retry after release', async () => {
   const e = engine(), s = e.createSession(), calls = [];
   s.threadId = 'occupied-thread';

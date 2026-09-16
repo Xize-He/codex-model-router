@@ -350,12 +350,13 @@
 .session-history-refresh:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-strong); }
 .session-history-refresh:focus-visible { outline: 2px solid var(--text-muted); outline-offset: 2px; }
 .sidebar-project-list { display: grid; gap: 2px; }
+.sidebar-project { position: relative; }
 .sidebar-project > summary {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 34px;
-  padding: 0 8px;
+  padding: 0 42px 0 8px;
   border-radius: 8px;
   color: var(--text-secondary);
   font-size: 13px;
@@ -380,6 +381,65 @@
 .sidebar-project[open] > summary .sidebar-project-chevron { transform: rotate(90deg); }
 .sidebar-project-folder { flex: 0 0 15px; color: var(--text-secondary); }
 .sidebar-project[open] > summary .sidebar-project-folder { color: var(--text-strong); }
+.sidebar-project-actions {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.sidebar-project:hover .sidebar-project-actions,
+.sidebar-project:focus-within .sidebar-project-actions { opacity: 1; pointer-events: auto; }
+.sidebar-project-actions button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  place-items: center;
+  background: var(--surface-selected);
+  color: var(--text-secondary);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.sidebar-project-actions button:hover,
+.sidebar-project-actions button:focus-visible { background: var(--surface-hover); color: var(--text-strong); }
+.sidebar-project-actions button:focus-visible { outline: 2px solid var(--text-muted); outline-offset: 2px; }
+.sidebar-project-info {
+  position: absolute;
+  z-index: 6;
+  top: 36px;
+  left: 24px;
+  right: 5px;
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-3px);
+  background: var(--surface-elevated);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 16%);
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.sidebar-project > summary:hover ~ .sidebar-project-info,
+.sidebar-project > summary:focus-visible ~ .sidebar-project-info {
+  opacity: 1;
+  transform: translateY(0);
+}
+.sidebar-project-info code {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sidebar-project-sessions { min-width: 0; padding: 2px 0 4px 12px; }
 .sidebar-project-sessions .session-row { min-width: 0; max-width: 100%; }
 .archived-session-link {
