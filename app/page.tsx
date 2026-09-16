@@ -1535,7 +1535,7 @@ export default function Home() {
         <div className="sidebar-primary-actions">
           <Button
             className="new-chat"
-            onClick={create}
+            onClick={() => void create()}
             disabled={busy || !online}
           >
             <MessageCirclePlus className="sidebar-action-icon" size={18} strokeWidth={1.75} />
