@@ -239,7 +239,7 @@ const CLOSED_INSPECTOR_SECTIONS: InspectorSections = {
 
 const PANEL_LIMITS = {
   left: { min: 190, max: 420, fallback: 270 },
-  right: { min: 280, max: 520, fallback: 400 },
+  right: { min: 280, max: 1200, fallback: 400 },
 } as const;
 
 function clampPanelWidth(side: PanelSide, width: number) {
