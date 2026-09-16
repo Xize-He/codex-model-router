@@ -354,8 +354,8 @@ const accountTypeText: Record<string, string> = {
   personalAccessToken: '访问令牌',
   agentIdentity: 'Agent Identity',
 };
-const shortModel = (m = '') => m.startsWith('deepseek') ? 'DeepSeek Flash' : m.replace('gpt-', 'GPT-');
-const modelLabel = (model: Model) => model.model.startsWith('deepseek') ? 'DeepSeek Flash' : model.displayName;
+const shortModel = (m = '') => m.startsWith('deepseek') ? 'DeepSeek Flash · Harness' : m.replace('gpt-', 'GPT-');
+const modelLabel = (model: Model) => model.model.startsWith('deepseek') ? 'DeepSeek Flash · Harness' : model.displayName;
 const normalizeWorkspacePath = (cwd: string) => {
   const normalized = cwd.trim().replace(/\\/g, '/').replace(/\/+$/, '');
   return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;

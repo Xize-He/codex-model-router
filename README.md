@@ -17,7 +17,7 @@ corepack pnpm build
 
 1. 在资源管理器中双击 `启动工作台.cmd`。它不需要更改 PowerShell 执行策略。
 2. 浏览器打开 `http://127.0.0.1:7341`。首次使用时在“状态”面板登录 Codex；已登录的本机 Codex 账户会自动复用。
-3. 点击“新对话”或 Projects 目录旁的新建按钮，选择 **GPT · Codex** 或 **DeepSeek · Harness**。会话列表和标题旁显示类型标记；创建后类型固定，模型栏只显示该类型的模型与推理强度。GPT · Codex 支持 Auto，DeepSeek 显示简短的 DeepSeek Flash。Enter 发送，Shift + Enter 换行。
+3. 点击“新对话”或 Projects 目录旁的新建按钮，选择 **GPT · Codex** 或 **DeepSeek · Harness**。会话列表和标题旁显示类型标记；创建后类型固定，模型栏只显示该类型的模型与推理强度。GPT · Codex 支持 Auto，DeepSeek 显示为 DeepSeek Flash · Harness。Enter 发送，Shift + Enter 换行。
 4. 模型可调用当前已连接的 MCP 工具。标注 `readOnlyHint` 的只读工具可直接执行，其他工具会展示参数并等待你批准。命令和文件操作遵循 Codex 的审批请求。
 5. “停止当前任务”中断当前分类或执行。关闭网页不会停止后台任务。要关闭服务，双击 `停止工作台.cmd`。
 
