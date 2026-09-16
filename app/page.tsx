@@ -59,6 +59,7 @@ import {
   GitFork,
   Rows3,
   PanelsTopLeft,
+  Folder,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -600,14 +601,6 @@ export default function Home() {
         return false;
       }
     }),
-    [sessionsCollapsed, setSessionsCollapsed] = useState(() => {
-      try {
-        return typeof window !== 'undefined' &&
-          localStorage.getItem('model-router-sessions-collapsed') === 'true';
-      } catch {
-        return false;
-      }
-    }),
     [conversationMode, setConversationMode] = useState<'flow' | 'cards'>(() => {
       try {
         return typeof window !== 'undefined' &&
@@ -672,13 +665,6 @@ export default function Home() {
       /* Sidebar collapsing still works when browser storage is unavailable. */
     }
   }, [sidebarCollapsed]);
-  useEffect(() => {
-    try {
-      localStorage.setItem('model-router-sessions-collapsed', String(sessionsCollapsed));
-    } catch {
-      /* Session folding still works when browser storage is unavailable. */
-    }
-  }, [sessionsCollapsed]);
   useEffect(() => {
     try {
       localStorage.setItem('model-router-inspector-sections', JSON.stringify(inspectorSections));
@@ -821,13 +807,6 @@ export default function Home() {
       .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
       .slice(0, 30);
   }, [state?.sessions, historySearch]);
-  const activeSessionCount =
-    sessionCollections.recents.length +
-    sessionCollections.projects.reduce(
-      (total, project) => total + project.sessions.length,
-      0,
-    );
-  const archivedSessionCount = sessionCollections.archived.length;
   const primaryLimit =
     state?.usage.limits.find((item) => item.id === 'codex') ||
     state?.usage.limits[0];
@@ -1548,41 +1527,28 @@ export default function Home() {
             </SelectContent>
           </Select>
         </div>
-        <section className={`session-section ${sessionsCollapsed ? 'collapsed' : ''}`}>
-        <div className="session-section-header">
-          <button
-            type="button"
-            className="session-section-toggle"
-            aria-expanded={!sessionsCollapsed}
-            aria-controls="sidebar-session-list"
-            onClick={() => setSessionsCollapsed((current) => !current)}
-          >
-            <ChevronRight className="session-section-chevron" size={16} strokeWidth={1.75} />
-            <span>会话</span>
-            <b>{activeSessionCount}</b>
-          </button>
-          <button
-            className="session-section-refresh"
-            aria-label="刷新原生历史"
-            title="刷新原生历史"
-            onClick={() => void refreshSessions()}
-            disabled={state?.history.loading || state?.history.occupancyLoading}
-          >
-            <RefreshCw
-              size={18}
-              strokeWidth={1.75}
-              className={state?.history.loading || state?.history.occupancyLoading ? 'spin' : ''}
-            />
-          </button>
-        </div>
+        <section className="session-section">
         <div className="session-section-body" id="sidebar-session-list">
         <nav className="session-list" aria-label="对话记录">
           {sessionView === 'active' ? (
             <>
-              {!!sessionCollections.projects.length && (
-                <section className="session-group" aria-labelledby="projects-heading">
-                  <div className="session-group-heading" id="projects-heading">
-                    Projects
+              <section className="session-group" aria-labelledby="projects-heading">
+                  <div className="session-group-heading">
+                    <span id="projects-heading">Projects</span>
+                    <button
+                      type="button"
+                      className="session-history-refresh"
+                      aria-label="刷新会话"
+                      title="刷新会话"
+                      onClick={() => void refreshSessions()}
+                      disabled={state?.history.loading || state?.history.occupancyLoading}
+                    >
+                      <RefreshCw
+                        size={16}
+                        strokeWidth={1.75}
+                        className={state?.history.loading || state?.history.occupancyLoading ? 'spin' : ''}
+                      />
+                    </button>
                   </div>
                   <div className="sidebar-project-list">
                     {sessionCollections.projects.map((project, index) => {
@@ -1613,8 +1579,12 @@ export default function Home() {
                               size={14}
                               strokeWidth={1.75}
                             />
+                            <Folder
+                              className="sidebar-project-folder"
+                              size={15}
+                              strokeWidth={1.7}
+                            />
                             <span>{project.name}</span>
-                            <b>{project.sessions.length}</b>
                           </summary>
                           <div className="sidebar-project-sessions">
                             {project.sessions.map(renderSessionRow)}
@@ -1624,16 +1594,14 @@ export default function Home() {
                     })}
                   </div>
                 </section>
-              )}
-              {!!sessionCollections.recents.length && (
-                <section className="session-group" aria-labelledby="recents-heading">
+              <section className="session-group" aria-labelledby="recents-heading">
                   <div className="session-group-heading" id="recents-heading">
                     Recents
                   </div>
                   {sessionCollections.recents.map(renderSessionRow)}
                 </section>
-              )}
-              {!activeSessionCount && (
+              {!sessionCollections.projects.length &&
+                !sessionCollections.recents.length && (
                 <div className="session-empty">没有会话</div>
               )}
             </>
@@ -1664,7 +1632,6 @@ export default function Home() {
               <LoaderCircle size={12} className="spin" />
             )}
             <span>Archived</span>
-            {!!archivedSessionCount && <b>{archivedSessionCount}</b>}
           </button>
         )}
         {state?.history.error && (
