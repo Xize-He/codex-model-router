@@ -531,3 +531,16 @@
   font-size: 12px;
 }
 .archived-view-heading button:hover { background: var(--surface-hover); color: var(--text-strong); }
+.right-panel-tab { border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); padding: 7px 12px; font-size: 14px; }
+.right-panel-tab[aria-pressed='true'] { background: var(--surface-selected); color: var(--text-strong); }
+.file-browser { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.file-browser header { display: flex; align-items: center; gap: 8px; padding: 8px; }
+.file-browser header span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.file-browser header button { border: 0; background: transparent; color: var(--text-secondary); padding: 5px; border-radius: 5px; }
+.file-browser-tree { max-height: 40vh; overflow: auto; }
+.file-browser-row { display: flex; width: 100%; align-items: center; gap: 6px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); text-align: left; font-size: 13px; }
+.file-browser-row svg { flex-shrink: 0; }
+.file-browser-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-browser-row:hover { background: var(--surface-hover); color: var(--text-strong); }
+.file-browser-preview { min-width: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.file-browser-preview pre { max-height: 60vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; margin: 0; font-size: 13px; background: var(--surface); color: var(--text-body); }

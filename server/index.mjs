@@ -1,7 +1,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Engine } from './engine.mjs';
 import { loadRouterConfig } from './config.mjs';
@@ -63,6 +63,19 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'POST') return json(res, { error: 'Method not allowed' }, 405);
       if (!validToken(req.headers['x-router-token'])) return json(res, { error: '会话令牌无效，请刷新页面' }, 403);
       const input = await body(req);
+      if (url.pathname === '/api/files/list') {
+        const session = input.sessionId ? engine.findSession(input.sessionId) : null;
+        if (input.sessionId && !session) throw new Error('会话不存在');
+        const base = path.resolve(session?.cwd || engine.cwd);
+        const directory = path.resolve(input.path || base);
+        const relative = path.relative(base, directory);
+        if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw new Error('目录不属于当前项目');
+        const entries = readdirSync(directory, { withFileTypes: true })
+          .filter(entry => !entry.isSymbolicLink() && (entry.isDirectory() || entry.isFile()))
+          .map(entry => ({ name: entry.name, path: path.join(directory, entry.name), directory: entry.isDirectory() }))
+          .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name, undefined, { numeric: true }));
+        return json(res, { entries });
+      }
       if (url.pathname === '/api/files/read') {
         if (typeof input.path !== 'string' || !path.isAbsolute(input.path)) throw new Error('需要本地文件的绝对路径');
         const file = path.resolve(input.path);

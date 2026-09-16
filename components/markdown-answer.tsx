@@ -37,29 +37,11 @@ function localFilePath(value: string): string | null {
 }
 function AnswerLink({ href, children }: { href?: string; children?: ReactNode }) {
   const file = localFilePath(href || '') || (!href ? localFilePath(plainText(children)) : null);
-  const [preview, setPreview] = useState<string | null>(null);
-  async function openFile() {
-    setPreview('正在读取…');
-    try {
-      const state = await fetch('/api/state').then(response => response.json());
-      const response = await fetch('/api/files/read', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Router-Token': state.csrf },
-        body: JSON.stringify({ path: file }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '文件读取失败');
-      setPreview(result.text);
-    } catch (error) { setPreview((error as Error).message); }
+  function openFile() {
+    window.dispatchEvent(new CustomEvent('router-open-file', { detail: file }));
   }
   if (!file) return href ? <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
-  return <><a href="#local-file" title={file} onClick={event => { event.preventDefault(); void openFile(); }}>{children}</a>
-    {preview !== null && <div className="local-file-overlay" onClick={() => setPreview(null)}>
-      <section className="local-file-preview" role="dialog" aria-modal="true" aria-label={file} onClick={event => event.stopPropagation()}>
-        <header><strong>{file}</strong><button autoFocus type="button" onClick={() => setPreview(null)}>关闭</button></header>
-        <pre>{preview}</pre>
-      </section>
-    </div>}
-  </>;
+  return <a href="#local-file" title={file} onClick={event => { event.preventDefault(); openFile(); }}>{children}</a>;
 }
 const components = {
   pre: CodeBlock,

@@ -75,6 +75,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select';
 import { MarkdownAnswer } from '@/components/markdown-answer';
+import { FileBrowser } from '@/components/file-browser';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -570,6 +571,8 @@ export default function Home() {
     [dragActive, setDragActive] = useState(false),
     [attachments, setAttachments] = useState<Attachment[]>([]),
     [settings, setSettings] = useState(false),
+    [rightPanel, setRightPanel] = useState<'status' | 'files'>('status'),
+    [requestedFile, setRequestedFile] = useState({ path: '', sessionId: '' }),
     [inspectorSections, setInspectorSections] = useState(storedInspectorSections),
     [online, setOnline] = useState(false),
     [historySearch, setHistorySearch] = useState(''),
@@ -642,6 +645,15 @@ export default function Home() {
       return 'light';
     }
   });
+  useEffect(() => {
+    const openFile = (event: Event) => {
+      const path = (event as CustomEvent<string>).detail;
+      if (!path) return;
+      setRequestedFile({ path, sessionId: selected }); setRightPanel('files'); setSettings(true); setFocusMode(false);
+    };
+    window.addEventListener('router-open-file', openFile);
+    return () => window.removeEventListener('router-open-file', openFile);
+  }, [selected]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
@@ -1991,7 +2003,10 @@ export default function Home() {
             >
               {focusMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
             </Button>
-            <Button variant="outline" onClick={() => setSettings(!settings)}>
+            <Button variant="outline" onClick={() => { setRightPanel('files'); setSettings(true); setFocusMode(false); }}>
+              <Folder size={16} />文件
+            </Button>
+            <Button variant="outline" onClick={() => { setRightPanel('status'); setSettings(rightPanel !== 'status' || !settings); }}>
               <SlidersHorizontal size={16} />
               状态
             </Button>
@@ -2636,6 +2651,8 @@ export default function Home() {
             onKeyDown={(event) => resizePanelWithKeyboard('right', event)}
           />
           <div className="inspector-heading">
+            <button className="right-panel-tab" aria-pressed={rightPanel === 'files'} onClick={() => setRightPanel('files')}>文件</button>
+            <button className="right-panel-tab" aria-pressed={rightPanel === 'status'} onClick={() => setRightPanel('status')}>状态</button>
             <Button
               variant="ghost"
               size="icon"
@@ -2645,6 +2662,8 @@ export default function Home() {
               <X size={18} />
             </Button>
           </div>
+          {rightPanel === 'files' && <FileBrowser key={selected} sessionId={selected} cwd={session?.cwd || state?.cwd} requestedPath={requestedFile.sessionId === selected ? requestedFile.path : ''} />}
+          <div hidden={rightPanel !== 'status'}>
           <section>
             <details
               className="inspector-details"
@@ -2772,6 +2791,7 @@ export default function Home() {
               </div>
             </details>
           </section>
+          </div>
         </aside>
       )}
       <RoutingSettings
