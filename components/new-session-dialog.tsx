@@ -7,7 +7,6 @@ import { SessionKindIcon } from '@/components/session-kind-icon';
 export type SessionKind = keyof typeof sessionKindLabels;
 const descriptions: Record<SessionKind, string> = {
   'gpt-codex': 'Codex 模型 · 支持 Auto 路由',
-  'deepseek-codex': 'DeepSeek 模型 · Codex 工具与上下文',
   'deepseek-harness': 'DeepSeek 模型 · Harness 工具与上下文',
 };
 export function NewSessionDialog({ cwd, onClose, onCreate }: {

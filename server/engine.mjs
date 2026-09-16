@@ -7,7 +7,7 @@ import { CodexRPC } from './rpc.mjs';
 import { HARNESS_MODEL, harnessModel, harnessRuntime, deleteHarnessSession } from './harness.mjs';
 import { runHarness } from './harness-runner.mjs';
 import { sessionKind, validSessionKind, sessionAllowsModel } from '../lib/session-kind.mjs';
-import { DEEPSEEK_MODEL, DEEPSEEK_PROVIDER, deepseekModel, deepseekSettings, sessionUsesDeepseek, checkDeepseekKey } from './deepseek.mjs';
+import { checkDeepseekKey } from './deepseek.mjs';
 import { McpRegistry } from './mcp.mjs';
 import { normalizeMcpServers, saveRoutingConfig } from './config.mjs';
 import { prepareUndo, undoFiles } from './file-undo.mjs';
@@ -234,7 +234,7 @@ export class Engine extends EventEmitter {
       try { this.occupancy = JSON.parse(readFileSync(this.occupancyPath, 'utf8')); } catch { this.occupancy = {}; }
     }
     const secretEnv = this.config.mcpServers.map(item => item.tokenEnv).filter(Boolean);
-    this.createProbeRpc = () => new CodexRPC({ secretEnv, providerEnv: { DEEPSEEK_API_KEY: this.deepseekKey } });
+    this.createProbeRpc = () => new CodexRPC({ secretEnv });
     if (existsSync(this.historyPath)) {
       try { this.sessions = JSON.parse(readFileSync(this.historyPath, 'utf8')); } catch { this.error = '历史记录无法读取，原文件已保留'; this.historyPath = path.join(this.dataDir, `history-recovered-${Date.now()}.json`); }
       for (const s of this.sessions) { s.loaded = false; s.source ||= 'router'; s.updatedAt ||= s.createdAt; s.context ||= null; s.compaction ||= { status: 'idle', lastAt: null }; s.approvalMode ||= 'approve-for-me'; s.appliedApprovalMode = null; s.webSearchMode ||= 'auto'; s.appliedWebSearchMode = null; s.mcpServerIds ||= s.mcpAttached ? this.config.mcpServers.slice(0, 1).map(item => item.id) : []; this.applyOccupancy(s); for (const t of s.tasks) if (!terminal(t.status)) { t.status = 'interrupted'; t.error = '上次服务退出，任务未自动重试'; } }
@@ -242,8 +242,8 @@ export class Engine extends EventEmitter {
     this.mcp = new McpRegistry(this.config.mcpServers);
     this.mcpStatuses = this.mcp.statuses();
   }
-  allSessions() { return [...this.sessions, ...this.nativeSessions, ...this.nativeArchivedSessions].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)); }
-  findSession(id) { return this.sessions.find(s => s.id === id) || this.nativeSessions.find(s => s.id === id) || this.nativeArchivedSessions.find(s => s.id === id); }
+  allSessions() { return [...this.sessions, ...this.nativeSessions, ...this.nativeArchivedSessions].filter(session => validSessionKind(sessionKind(session))).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)); }
+  findSession(id) { return this.allSessions().find(session => session.id === id); }
   publicState() {
     const levels = Object.keys(this.config.routes || {});
     const config = {
@@ -256,7 +256,7 @@ export class Engine extends EventEmitter {
     };
     const mcpServers = this.mcpStatuses.map(server => ({ name: server.name || server.configuredName, connected: server.connected, enabled: server.enabled }));
     const runtime = harnessRuntime(this.root);
-    return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, harnessModel, deepseekModel], config, cwd: this.cwd,
+    return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, harnessModel], config, cwd: this.cwd,
       harness: { installed: !!runtime, version: runtime?.version || null },
       deepseek: { configured: !!this.deepseekKey, checkedAt: this.deepseekCheckedAt, updating: this.providerUpdating },
       account: this.account, mcpServers, sessions: this.allSessions().map(session => ({ ...session, kind: sessionKind(session) })), history: this.history, usage: this.usage, activeId: this.active?.task.id || null,
@@ -387,7 +387,7 @@ export class Engine extends EventEmitter {
     if (persist) this.persistOccupancy();
   }
   async initialize() {
-    this.rpc = new CodexRPC({ secretEnv: this.config.mcpServers.map(item => item.tokenEnv).filter(Boolean), providerEnv: { DEEPSEEK_API_KEY: this.deepseekKey } });
+    this.rpc = new CodexRPC({ secretEnv: this.config.mcpServers.map(item => item.tokenEnv).filter(Boolean) });
     this.rpc.on('notification', m => this.onNotification(m));
     this.rpc.on('request', m => { this.onRequest(m).catch(e => this.rpc.reject(m.id, e.message)); });
     this.rpc.on('closed', e => {
@@ -414,16 +414,6 @@ export class Engine extends EventEmitter {
       this.deepseekCheckedAt = Date.now();
       if (!checkOnly && key !== this.deepseekKey) {
         this.deepseekKey = key;
-        // Credentials live only in this service process and its child environment.
-        clearTimeout(this.usageRefreshTimer);
-        const previous = this.rpc;
-        previous?.removeAllListeners();
-        if (previous) {
-          const stopped = new Promise(resolve => { previous.child.once('exit', resolve); setTimeout(resolve, 3000).unref(); });
-          previous.close(); await stopped;
-        }
-        for (const session of this.allSessions()) session.loaded = false;
-        await this.initialize();
       }
       return { ok: true };
     } finally { this.providerUpdating = false; this.changed(); }
@@ -647,7 +637,6 @@ export class Engine extends EventEmitter {
             await probe.request('thread/resume', {
               threadId: session.threadId,
               cwd: session.cwd || this.cwd,
-              ...(sessionUsesDeepseek(session) ? deepseekSettings() : {}),
             }, 15000);
             this.setOccupancy(session, false, null, false);
           } catch (error) {
@@ -773,16 +762,14 @@ export class Engine extends EventEmitter {
     const resolvedAttachments = this.resolveAttachments(attachments);
     if (!prompt.trim() && !resolvedAttachments.length) throw new Error('请输入问题或添加附件');
     const routingConfig = structuredClone(this.config);
-    if (model !== 'auto') pickRoute(routingConfig, [...this.models, deepseekModel, harnessModel], Object.keys(routingConfig.routes || {})[0], model, effort);
+    if (model !== 'auto') pickRoute(routingConfig, [...this.models, harnessModel], Object.keys(routingConfig.routes || {})[0], model, effort);
     const session = this.findSession(sessionId); if (!session) throw new Error('对话不存在');
     const harness = model === HARNESS_MODEL;
-    const deepseek = model === DEEPSEEK_MODEL || harness;
     if (harness && !harnessRuntime(this.root) && !this.createHarness) throw new Error('尚未安装 DeepSeek Harness，请执行 npm run harness:install 后重试');
     if ((session.harnessSessionId || session.engine === 'harness') && !harness || session.threadId && harness) throw new Error('此会话已绑定另一执行引擎，请新建对话后选择所需模型');
-    if (deepseek && !this.deepseekKey) throw new Error('请在右侧「状态 → DeepSeek」配置 API Key 后再使用');
-    if (session.threadId && sessionUsesDeepseek(session) !== deepseek) throw new Error('此会话已绑定另一模型提供商，请新建对话后选择所需模型');
+    if (harness && !this.deepseekKey) throw new Error('请在右侧「状态 → DeepSeek」配置 API Key 后再使用');
     if (!sessionAllowsModel(sessionKind(session), model)) throw new Error('模型不属于此会话类型，请新建相应类型的对话');
-    if (deepseek) { webSearchMode = 'disabled'; approvalMode = 'ask'; }
+    if (harness) { webSearchMode = 'disabled'; approvalMode = 'ask'; }
     if (!['ask', 'approve-for-me'].includes(approvalMode)) throw new Error('审批方式无效');
     webSearchSettings(webSearchMode);
     if (session.native && !session.historyLoaded) throw new Error('请等待原生会话历史加载完成');
@@ -799,16 +786,14 @@ export class Engine extends EventEmitter {
   async run(ctx) {
     const { task, session } = ctx;
     const sessionCwd = session.cwd || this.cwd;
-    const deepseek = task.mode === DEEPSEEK_MODEL;
-    const provider = deepseek ? deepseekSettings() : {};
     const routingConfig = ctx.routingConfig || this.config;
     try {
       const approval = approvalSettings(task.approvalMode);
-      const webSearch = { ...webSearchSettings(task.webSearchMode), ...provider.config };
+      const webSearch = webSearchSettings(task.webSearchMode);
       // Acquire the existing conversation before spending a classifier call.
       // Thread status is local to an app-server and cannot prove another process released its writer.
       if (session.threadId && (!session.loaded || session.appliedWebSearchMode !== task.webSearchMode)) {
-        await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, ...(deepseek ? { modelProvider: provider.modelProvider } : {}), config: webSearch, ...approval });
+        await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, config: webSearch, ...approval });
         session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; this.setOccupancy(session, false);
       } else if (session.threadId && session.appliedApprovalMode !== task.approvalMode) {
         await this.rpc.request('thread/settings/update', { threadId: session.threadId, ...approval });
@@ -842,21 +827,20 @@ export class Engine extends EventEmitter {
         }, true, 90000);
         classification = parseRoute(text, routeLevels);
       }
-      task.route = { ...classification, ...pickRoute(routingConfig, [...this.models, deepseekModel], classification.level, task.mode, task.requestedEffort), classifier: task.mode === 'auto' ? `${routingConfig.classifier} / ${routingConfig.classifierEffort || 'default'}` : null };
-      const routedModel = [...this.models, deepseekModel].find(item => item.model === task.route.model);
+      task.route = { ...classification, ...pickRoute(routingConfig, this.models, classification.level, task.mode, task.requestedEffort), classifier: task.mode === 'auto' ? `${routingConfig.classifier} / ${routingConfig.classifierEffort || 'default'}` : null };
+      const routedModel = this.models.find(item => item.model === task.route.model);
       if (task.attachments.some(item => item.kind === 'image') && routedModel?.inputModalities && !routedModel.inputModalities.includes('image')) throw new Error(`${routedModel.displayName || routedModel.model} 不支持图片输入，请选择支持图片的模型`);
       if (ctx.controller.signal.aborted) throw new Error('已停止');
       task.status = 'starting'; this.changed();
       if (!session.threadId) {
         const created = await this.rpc.request('thread/start', {
           model: task.route.model, cwd: sessionCwd, sandbox: 'workspace-write', ...approval,
-          ...(deepseek ? { modelProvider: provider.modelProvider } : {}),
           config: webSearch,
           dynamicTools: [...this.mcp.dynamicTools(), routingTool],
           developerInstructions: 'Respond in Chinese unless requested otherwise. This is a local model-router client. Use supplied MCP tools only when relevant to the user request. Do not automatically persist task history through an MCP tool. Ask before sensitive or destructive actions. Never read or reveal authentication secrets. Write task files only inside the active project working directory unless the user explicitly approves wider access. Do not spawn subagents unless the user asks. Tool calls can be cancelled; do not automatically repeat a write after interruption.',
         });
         session.routingToolVersion = 1;
-        session.modelProvider = deepseek ? DEEPSEEK_PROVIDER : (created.thread.modelProvider || 'openai');
+        session.modelProvider = created.thread.modelProvider || 'openai';
         session.threadId = created.thread.id; session.loaded = true; session.appliedApprovalMode = task.approvalMode; session.appliedWebSearchMode = task.webSearchMode; session.mcpServerIds = this.mcp.connectedIds(); session.mcpAttached = session.mcpServerIds.length > 0; session.cwd = sessionCwd; this.save();
       }
       task.escalationAvailable = task.mode === 'auto' && session.routingToolVersion === 1;
@@ -1143,7 +1127,7 @@ export class Engine extends EventEmitter {
     if (!session?.threadId || !task || !terminal(task.status) || !task.messages?.length) throw new Error('这条回复暂时不能创建分支');
     if (session.native && !session.historyLoaded) throw new Error('请等待原生会话历史加载完成');
     const lastTurnId = await this.resolveTaskTurnId(session, task);
-    const result = await this.rpc.request('thread/fork', { threadId: session.threadId, lastTurnId, ...(sessionUsesDeepseek(session) ? deepseekSettings() : {}) }, 30000);
+    const result = await this.rpc.request('thread/fork', { threadId: session.threadId, lastTurnId }, 30000);
     const now = Date.now();
     const branch = {
       id: randomUUID(), threadId: result.thread.id, title: `${session.title}（分支）`,
@@ -1164,7 +1148,7 @@ export class Engine extends EventEmitter {
     const session = this.findSession(id); if (!session?.threadId) throw new Error('这个对话还没有可压缩的原生历史');
     if (session.occupied === true && !session.loaded) throw new Error('该会话仍被另一个 Codex 客户端占用，请刷新会话状态后重试');
     try {
-      if (!session.loaded) { await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, config: webSearchSettings(session.webSearchMode), ...approvalSettings(session.approvalMode), ...(sessionUsesDeepseek(session) ? deepseekSettings() : {}) }); session.loaded = true; session.appliedApprovalMode = session.approvalMode; session.appliedWebSearchMode = session.webSearchMode; this.setOccupancy(session, false); }
+      if (!session.loaded) { await this.rpc.request('thread/resume', { threadId: session.threadId, cwd: session.cwd || this.cwd, config: webSearchSettings(session.webSearchMode), ...approvalSettings(session.approvalMode) }); session.loaded = true; session.appliedApprovalMode = session.approvalMode; session.appliedWebSearchMode = session.webSearchMode; this.setOccupancy(session, false); }
       session.compaction = { status: 'running', lastAt: Date.now() }; this.changed();
       await this.rpc.request('thread/compact/start', { threadId: session.threadId }, 20000);
       return session.compaction;

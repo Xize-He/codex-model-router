@@ -3,13 +3,13 @@ import { createInterface } from 'node:readline';
 import { EventEmitter } from 'node:events';
 
 export class CodexRPC extends EventEmitter {
-  constructor({ bin = process.env.ROUTER_CODEX_BIN || 'codex', args = [], secretEnv = [], providerEnv = {} } = {}) {
+  constructor({ bin = process.env.ROUTER_CODEX_BIN || 'codex', args = [], secretEnv = [] } = {}) {
     super(); this.seq = 0; this.pending = new Map(); this.closed = false; this.stderr = '';
     const pluginNames = ['codex-app-tools','visualize','sites','browser','unified-computer-use'];
     const plugins = pluginNames.flatMap(name => ['-c', `plugins."${name}@openai-bundled".enabled=false`]);
     // Do not attach this independent client to the parent desktop task's IPC bridge.
-    const env = { ...process.env, ...providerEnv };
-    for (const key of ['CODEX_APP_TOOLS_PIPE_PATH', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE', 'CODEX_SESSION_ID', 'CODEX_THREAD_ID']) delete env[key];
+    const env = { ...process.env };
+    for (const key of ['DEEPSEEK_API_KEY', 'DEEPSEEK_BASE_URL', 'CODEX_APP_TOOLS_PIPE_PATH', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE', 'CODEX_SESSION_ID', 'CODEX_THREAD_ID']) delete env[key];
     for (const key of Object.keys(env)) if (secretEnv.some(name => name.toLowerCase() === key.toLowerCase())) delete env[key];
     this.child = spawn(bin, ['app-server', '--stdio',
       '-c', 'features.apps=false', '-c', 'mcp_servers.node_repl.enabled=false',

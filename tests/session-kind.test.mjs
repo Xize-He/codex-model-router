@@ -18,18 +18,19 @@ test('creation persists the chosen type, keeps project cwd and rejects incompati
   const config = { mcpServers: [], routes: { simple: { model: 'gpt-test', effort: 'low' } } };
   const e = new Engine(root, config); e.status = 'ready'; e.deepseekKey = 'test-only';
   e.models = [{ model: 'gpt-test', defaultReasoningEffort: 'low', supportedReasoningEfforts: [{ reasoningEffort: 'low' }] }];
+  e.createHarness = () => { throw new Error('Should not execute'); };
   e.run = async () => { throw new Error('Should not execute'); };
   assert.throws(() => e.createSession({ kind: 'unknown' }), /会话类型无效/);
-  for (const kind of ['gpt-codex', 'deepseek-codex', 'deepseek-harness']) {
+  for (const kind of ['gpt-codex', 'deepseek-harness']) {
     const session = e.createSession({ kind, cwd: root });
     assert.equal(session.kind, kind); assert.equal(session.cwd, root);
-    const wrong = kind === 'gpt-codex' ? 'deepseek-flash' : 'auto';
+    const wrong = kind === 'gpt-codex' ? 'deepseek-harness/flash' : 'auto';
     assert.throws(() => e.submit({ sessionId: session.id, prompt: 'test', model: wrong }), /不属于此会话类型/);
     assert.equal(session.tasks.length, 0); assert.equal(e.active, null);
     assert.equal(sessionAllowsModel(kind, defaultSessionModel(kind)), true);
   }
   const restored = new Engine(root, config);
   assert.deepEqual(restored.sessions.map(s => s.kind), e.sessions.map(s => s.kind));
-  assert.equal(restored.publicState().sessions.length, 3);
+  assert.equal(restored.publicState().sessions.length, 2);
   assert.deepEqual(restored.config.routes, config.routes, 'conversation type must not change global routing');
 });
