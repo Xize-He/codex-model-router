@@ -342,6 +342,14 @@ const accountTypeText: Record<string, string> = {
   agentIdentity: 'Agent Identity',
 };
 const shortModel = (m = '') => m.replace('gpt-', 'GPT-');
+const normalizeWorkspacePath = (cwd: string) => {
+  const normalized = cwd.trim().replace(/\\/g, '/').replace(/\/+$/, '');
+  return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
+};
+const workspaceName = (cwd: string) => {
+  const normalized = cwd.trim().replace(/\\/g, '/').replace(/\/+$/, '');
+  return normalized.split('/').filter(Boolean).at(-1) || cwd;
+};
 const accountInitial = (name?: string | null) =>
   Array.from((name || 'C').trim())[0]?.toUpperCase() || 'C';
 const isFinished = (s: string) =>
@@ -571,6 +579,7 @@ export default function Home() {
     [replyActionBusy, setReplyActionBusy] = useState(''),
     [sessionView, setSessionView] = useState<'active' | 'archived'>('active'),
     [sessionMenu, setSessionMenu] = useState(''),
+    [openProjects, setOpenProjects] = useState<Record<string, boolean>>({}),
     [sessionActionBusy, setSessionActionBusy] = useState(''),
     [renameTarget, setRenameTarget] = useState<Session | null>(null),
     [renameTitle, setRenameTitle] = useState(''),
@@ -769,13 +778,42 @@ export default function Home() {
   const activeTaskIsSelected = Boolean(
     state?.activeId && tasks.some((task) => task.id === state.activeId),
   );
-  const visibleSessions = useMemo(
-    () =>
-      (state?.sessions || []).filter(
-        (item) => Boolean(item.archived) === (sessionView === 'archived'),
+  const sessionCollections = useMemo(() => {
+    const projects = new Map<
+      string,
+      { cwd: string; name: string; sessions: Session[] }
+    >();
+    const recents: Session[] = [];
+    const archived: Session[] = [];
+    for (const item of state?.sessions || []) {
+      if (item.archived) {
+        archived.push(item);
+        continue;
+      }
+      const cwd = item.cwd?.trim();
+      if (!cwd) {
+        recents.push(item);
+        continue;
+      }
+      const key = normalizeWorkspacePath(cwd);
+      const project = projects.get(key) || {
+        cwd,
+        name: workspaceName(cwd),
+        sessions: [],
+      };
+      project.sessions.push(item);
+      projects.set(key, project);
+    }
+    const newest = (items: Session[]) =>
+      Math.max(...items.map((item) => item.updatedAt || item.createdAt), 0);
+    return {
+      projects: [...projects.values()].sort(
+        (left, right) => newest(right.sessions) - newest(left.sessions),
       ),
-    [state?.sessions, sessionView],
-  );
+      recents,
+      archived,
+    };
+  }, [state?.sessions]);
   const searchResults = useMemo(() => {
     const query = historySearch.trim().toLocaleLowerCase();
     return [...(state?.sessions || [])]
@@ -783,8 +821,13 @@ export default function Home() {
       .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
       .slice(0, 30);
   }, [state?.sessions, historySearch]);
-  const activeSessionCount = state?.sessions.filter((item) => !item.archived).length || 0,
-    archivedSessionCount = state?.sessions.filter((item) => item.archived).length || 0;
+  const activeSessionCount =
+    sessionCollections.recents.length +
+    sessionCollections.projects.reduce(
+      (total, project) => total + project.sessions.length,
+      0,
+    );
+  const archivedSessionCount = sessionCollections.archived.length;
   const primaryLimit =
     state?.usage.limits.find((item) => item.id === 'codex') ||
     state?.usage.limits[0];
@@ -1133,6 +1176,10 @@ export default function Home() {
     sessionViewRef.current = view;
     setSessionView(view);
     setSelected(target.id);
+    if (target.cwd) {
+      const projectKey = normalizeWorkspacePath(target.cwd);
+      setOpenProjects((current) => ({ ...current, [projectKey]: true }));
+    }
     setSessionMenu('');
     setHistorySearchOpen(false);
     setHistorySearch('');
@@ -1313,6 +1360,103 @@ export default function Home() {
       /* Keyboard resizing still works without browser storage. */
     }
   }
+  function renderSessionRow(item: Session) {
+    return (
+      <div className="session-row" key={item.id}>
+        <button
+          className={`session-button ${item.id === selected ? 'selected' : ''}`}
+          onClick={() => {
+            setSelected(item.id);
+            setSessionMenu('');
+          }}
+        >
+          <span className="session-copy">
+            <span>{item.title}</span>
+            {(item.occupancyChecking || item.occupied) && (
+              <small>
+                {item.occupancyChecking ? (
+                  <span className="occupancy-checking">检测中</span>
+                ) : item.occupied ? (
+                  <span
+                    className="occupied-badge"
+                    title={
+                      item.occupancyCheckedAt
+                        ? `检测于 ${new Date(item.occupancyCheckedAt).toLocaleTimeString()}`
+                        : '已检测到其他客户端占用'
+                    }
+                  >
+                    <LockKeyhole size={10} />被占用
+                  </span>
+                ) : null}
+              </small>
+            )}
+          </span>
+          {(item.tasks.some((task) => !isFinished(task.status)) ||
+            item.nativeStatus?.type === 'active') && (
+            <LoaderCircle
+              size={14}
+              className="session-running spin"
+              aria-label="正在运行"
+            />
+          )}
+        </button>
+        <button
+          type="button"
+          className="session-manage"
+          aria-label={`管理会话：${item.title}`}
+          aria-expanded={sessionMenu === item.id}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() =>
+            setSessionMenu((current) => (current === item.id ? '' : item.id))
+          }
+        >
+          <MoreHorizontal size={15} />
+        </button>
+        {sessionMenu === item.id && (
+          <div
+            className="session-menu"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <button
+              disabled={!!state?.activeId || sessionActionBusy === item.id}
+              onClick={() => {
+                setRenameTarget(item);
+                setRenameTitle(item.title);
+                setSessionMenu('');
+              }}
+            >
+              <Pencil size={14} />
+              重命名
+            </button>
+            <button
+              disabled={!!state?.activeId || sessionActionBusy === item.id}
+              onClick={() =>
+                void manageSession(item, item.archived ? 'unarchive' : 'archive')
+              }
+            >
+              {item.archived ? (
+                <ArchiveRestore size={14} />
+              ) : (
+                <Archive size={14} />
+              )}
+              {item.archived ? '恢复会话' : '归档会话'}
+            </button>
+            <button
+              className="danger"
+              disabled={!!state?.activeId || sessionActionBusy === item.id}
+              onClick={() => {
+                setDeleteTarget(item);
+                setSessionMenu('');
+              }}
+            >
+              <Trash2 size={14} />
+              永久删除
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div
       ref={workbenchRef}
@@ -1432,101 +1576,97 @@ export default function Home() {
           </button>
         </div>
         <div className="session-section-body" id="sidebar-session-list">
-        <div className="session-view-toggle" aria-label="会话范围">
-          <button
-            className={sessionView === 'active' ? 'selected' : ''}
-            onClick={() => void showSessionView('active')}
-          >
-            当前 <b>{activeSessionCount}</b>
-          </button>
-          <button
-            className={sessionView === 'archived' ? 'selected' : ''}
-            onClick={() => void showSessionView('archived')}
-          >
-            {state?.history.archivedLoading && <LoaderCircle size={12} className="spin" />}
-            已归档 <b>{archivedSessionCount}</b>
-          </button>
-        </div>
         <nav className="session-list" aria-label="对话记录">
-          {!visibleSessions.length && (
-            <div className="session-empty">
-              {sessionView === 'archived' ? '没有已归档的会话' : '没有会话'}
-            </div>
-          )}
-          {visibleSessions.map((s) => (
-            <div className="session-row" key={s.id}>
-              <button
-                className={`session-button ${s.id === selected ? 'selected' : ''}`}
-                onClick={() => { setSelected(s.id); setSessionMenu(''); }}
-              >
-                <span className="session-copy">
-                  <span>{s.title}</span>
-                  {(s.occupancyChecking || s.occupied) && (
-                    <small>
-                    {s.occupancyChecking ? (
-                      <span className="occupancy-checking">检测中</span>
-                    ) : s.occupied ? (
-                      <span
-                        className="occupied-badge"
-                        title={s.occupancyCheckedAt ? `检测于 ${new Date(s.occupancyCheckedAt).toLocaleTimeString()}` : '已检测到其他客户端占用'}
-                      >
-                        <LockKeyhole size={10} />被占用
-                      </span>
-                    ) : null}
-                    </small>
-                  )}
-                </span>
-                {(s.tasks.some((t) => !isFinished(t.status)) || s.nativeStatus?.type === 'active') && (
-                  <LoaderCircle
-                    size={14}
-                    className="session-running spin"
-                    aria-label="正在运行"
-                  />
-                )}
-              </button>
-              <button
-                type="button"
-                className="session-manage"
-                aria-label={`管理会话：${s.title}`}
-                aria-expanded={sessionMenu === s.id}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={() => setSessionMenu((current) => current === s.id ? '' : s.id)}
-              >
-                <MoreHorizontal size={15} />
-              </button>
-              {sessionMenu === s.id && (
-                <div className="session-menu" onPointerDown={(event) => event.stopPropagation()}>
-                  <button
-                    disabled={!!state?.activeId || sessionActionBusy === s.id}
-                    onClick={() => {
-                      setRenameTarget(s);
-                      setRenameTitle(s.title);
-                      setSessionMenu('');
-                    }}
-                  >
-                    <Pencil size={14} />
-                    重命名
-                  </button>
-                  <button
-                    disabled={!!state?.activeId || sessionActionBusy === s.id}
-                    onClick={() => void manageSession(s, s.archived ? 'unarchive' : 'archive')}
-                  >
-                    {s.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
-                    {s.archived ? '恢复会话' : '归档会话'}
-                  </button>
-                  <button
-                    className="danger"
-                    disabled={!!state?.activeId || sessionActionBusy === s.id}
-                    onClick={() => { setDeleteTarget(s); setSessionMenu(''); }}
-                  >
-                    <Trash2 size={14} />
-                    永久删除
-                  </button>
+          {sessionView === 'active' ? (
+            <>
+              {!!sessionCollections.projects.length && (
+                <section className="session-group" aria-labelledby="projects-heading">
+                  <div className="session-group-heading" id="projects-heading">
+                    Projects
+                  </div>
+                  <div className="sidebar-project-list">
+                    {sessionCollections.projects.map((project, index) => {
+                      const projectKey = normalizeWorkspacePath(project.cwd);
+                      return (
+                        <details
+                          className="sidebar-project"
+                          key={projectKey}
+                          open={
+                            openProjects[projectKey] ??
+                            (index === 0 ||
+                              project.sessions.some(
+                                (item) => item.id === selected,
+                              ))
+                          }
+                          onToggle={(event) => {
+                            const open = event.currentTarget.open;
+                            setOpenProjects((current) =>
+                              current[projectKey] === open
+                                ? current
+                                : { ...current, [projectKey]: open },
+                            );
+                          }}
+                        >
+                          <summary title={project.cwd}>
+                            <ChevronRight
+                              className="sidebar-project-chevron"
+                              size={14}
+                              strokeWidth={1.75}
+                            />
+                            <span>{project.name}</span>
+                            <b>{project.sessions.length}</b>
+                          </summary>
+                          <div className="sidebar-project-sessions">
+                            {project.sessions.map(renderSessionRow)}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+              {!!sessionCollections.recents.length && (
+                <section className="session-group" aria-labelledby="recents-heading">
+                  <div className="session-group-heading" id="recents-heading">
+                    Recents
+                  </div>
+                  {sessionCollections.recents.map(renderSessionRow)}
+                </section>
+              )}
+              {!activeSessionCount && (
+                <div className="session-empty">没有会话</div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="archived-view-heading">
+                <button onClick={() => void showSessionView('active')}>
+                  <ChevronLeft size={14} />
+                  返回
+                </button>
+                <span>Archived</span>
+              </div>
+              {!sessionCollections.archived.length && (
+                <div className="session-empty">
+                  {state?.history.archivedLoading ? '正在载入…' : '没有已归档的会话'}
                 </div>
               )}
-            </div>
-          ))}
+              {sessionCollections.archived.map(renderSessionRow)}
+            </>
+          )}
         </nav>
+        {sessionView === 'active' && (
+          <button
+            className="archived-session-link"
+            onClick={() => void showSessionView('archived')}
+          >
+            {state?.history.archivedLoading && (
+              <LoaderCircle size={12} className="spin" />
+            )}
+            <span>Archived</span>
+            {!!archivedSessionCount && <b>{archivedSessionCount}</b>}
+          </button>
+        )}
         {state?.history.error && (
           <div className="history-error">
             历史同步失败：{state.history.error}
