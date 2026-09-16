@@ -581,6 +581,19 @@ export default function Home() {
     [sessionView, setSessionView] = useState<'active' | 'archived'>('active'),
     [sessionMenu, setSessionMenu] = useState(''),
     [openProjects, setOpenProjects] = useState<Record<string, boolean>>({}),
+    [projectMenu, setProjectMenu] = useState(''),
+    [collapsedSessionGroups, setCollapsedSessionGroups] = useState(() => {
+      try {
+        const stored = localStorage.getItem('model-router-collapsed-session-groups');
+        const parsed = stored ? JSON.parse(stored) : null;
+        return {
+          projects: Boolean(parsed?.projects),
+          recents: Boolean(parsed?.recents),
+        };
+      } catch {
+        return { projects: false, recents: false };
+      }
+    }),
     [sessionActionBusy, setSessionActionBusy] = useState(''),
     [renameTarget, setRenameTarget] = useState<Session | null>(null),
     [renameTitle, setRenameTitle] = useState(''),
@@ -665,6 +678,16 @@ export default function Home() {
       /* Sidebar collapsing still works when browser storage is unavailable. */
     }
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'model-router-collapsed-session-groups',
+        JSON.stringify(collapsedSessionGroups),
+      );
+    } catch {
+      /* Group folding still works when browser storage is unavailable. */
+    }
+  }, [collapsedSessionGroups]);
   useEffect(() => {
     try {
       localStorage.setItem('model-router-inspector-sections', JSON.stringify(inspectorSections));
@@ -895,11 +918,14 @@ export default function Home() {
     setApprovalMode('approve-for-me');
   }, [session?.id]);
   useEffect(() => {
-    if (!sessionMenu) return;
-    const close = () => setSessionMenu('');
+    if (!sessionMenu && !projectMenu) return;
+    const close = () => {
+      setSessionMenu('');
+      setProjectMenu('');
+    };
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
-  }, [sessionMenu]);
+  }, [sessionMenu, projectMenu]);
   useEffect(() => {
     if (!accountMenu) return;
     const closeOutside = (event: PointerEvent) => {
@@ -1102,6 +1128,15 @@ export default function Home() {
       );
     } catch {
       setError('复制失败，请允许浏览器访问剪贴板后重试');
+    }
+  }
+  async function copyProjectPath(cwd: string) {
+    try {
+      await navigator.clipboard.writeText(cwd);
+      setError('');
+      setProjectMenu('');
+    } catch {
+      setError('复制工作目录失败，请允许浏览器访问剪贴板后重试');
     }
   }
   function editUserMessage(task: Task) {
@@ -1539,9 +1574,26 @@ export default function Home() {
         <nav className="session-list" aria-label="对话记录">
           {sessionView === 'active' ? (
             <>
-              <section className="session-group" aria-labelledby="projects-heading">
+              <section
+                className={`session-group ${collapsedSessionGroups.projects ? 'collapsed' : ''}`}
+                aria-labelledby="projects-heading"
+              >
                   <div className="session-group-heading">
-                    <span id="projects-heading">Projects</span>
+                    <button
+                      type="button"
+                      className="session-group-toggle"
+                      aria-expanded={!collapsedSessionGroups.projects}
+                      aria-controls="sidebar-project-list"
+                      onClick={() =>
+                        setCollapsedSessionGroups((current) => ({
+                          ...current,
+                          projects: !current.projects,
+                        }))
+                      }
+                    >
+                      <ChevronRight className="session-group-chevron" size={15} strokeWidth={1.75} />
+                      <span id="projects-heading">Projects</span>
+                    </button>
                     <button
                       type="button"
                       className="session-history-refresh"
@@ -1557,7 +1609,8 @@ export default function Home() {
                       />
                     </button>
                   </div>
-                  <div className="sidebar-project-list">
+                  {!collapsedSessionGroups.projects && (
+                  <div className="sidebar-project-list" id="sidebar-project-list">
                     {sessionCollections.projects.map((project, index) => {
                       const projectKey = normalizeWorkspacePath(project.cwd);
                       return (
@@ -1602,6 +1655,22 @@ export default function Home() {
                           <div className="sidebar-project-actions">
                             <button
                               type="button"
+                              aria-label={`管理项目：${project.name}`}
+                              aria-expanded={projectMenu === projectKey}
+                              title="项目操作"
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setProjectMenu((current) =>
+                                  current === projectKey ? '' : projectKey,
+                                );
+                              }}
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+                            <button
+                              type="button"
                               aria-label={`在 ${project.name} 中新建会话`}
                               title="在此项目中新建会话"
                               onClick={(event) => {
@@ -1613,6 +1682,28 @@ export default function Home() {
                               <MessageCirclePlus size={15} strokeWidth={1.75} />
                             </button>
                           </div>
+                          {projectMenu === projectKey && (
+                            <div
+                              className="sidebar-project-menu"
+                              onPointerDown={(event) => event.stopPropagation()}
+                            >
+                              <button onClick={() => void copyProjectPath(project.cwd)}>
+                                <Copy size={14} />
+                                复制工作目录
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setOpenProjects((current) => ({
+                                    ...current,
+                                    [projectKey]: false,
+                                  }));
+                                  setProjectMenu('');
+                                }}
+                              >
+                                收起会话
+                              </button>
+                            </div>
+                          )}
                           <div className="sidebar-project-sessions">
                             {project.sessions.map(renderSessionRow)}
                           </div>
@@ -1620,12 +1711,34 @@ export default function Home() {
                       );
                     })}
                   </div>
+                  )}
                 </section>
-              <section className="session-group" aria-labelledby="recents-heading">
-                  <div className="session-group-heading" id="recents-heading">
-                    Recents
+              <section
+                className={`session-group ${collapsedSessionGroups.recents ? 'collapsed' : ''}`}
+                aria-labelledby="recents-heading"
+              >
+                  <div className="session-group-heading">
+                    <button
+                      type="button"
+                      className="session-group-toggle"
+                      aria-expanded={!collapsedSessionGroups.recents}
+                      aria-controls="sidebar-recents-list"
+                      onClick={() =>
+                        setCollapsedSessionGroups((current) => ({
+                          ...current,
+                          recents: !current.recents,
+                        }))
+                      }
+                    >
+                      <ChevronRight className="session-group-chevron" size={15} strokeWidth={1.75} />
+                      <span id="recents-heading">Recents</span>
+                    </button>
                   </div>
+                  {!collapsedSessionGroups.recents && (
+                  <div id="sidebar-recents-list">
                   {sessionCollections.recents.map(renderSessionRow)}
+                  </div>
+                  )}
                 </section>
               {!sessionCollections.projects.length &&
                 !sessionCollections.recents.length && (
