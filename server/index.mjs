@@ -63,6 +63,15 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'POST') return json(res, { error: 'Method not allowed' }, 405);
       if (!validToken(req.headers['x-router-token'])) return json(res, { error: '会话令牌无效，请刷新页面' }, 403);
       const input = await body(req);
+      if (url.pathname === '/api/files/read') {
+        if (typeof input.path !== 'string' || !path.isAbsolute(input.path)) throw new Error('需要本地文件的绝对路径');
+        const file = path.resolve(input.path);
+        if (!/\.(md|txt|log|csv|json|ya?ml|toml|ini|xml|[cm]?[jt]sx?|py|c|cpp|h|hpp|sh|ps1|css|html|diff|patch)$/i.test(file)) throw new Error('此文件类型暂不支持文本预览');
+        const stat = statSync(file);
+        if (!stat.isFile()) throw new Error('该路径不是文件');
+        if (stat.size > 5 * 1024 * 1024) throw new Error('文件超过 5 MB，请在本地编辑器中打开');
+        return json(res, { text: readFileSync(file, 'utf8') });
+      }
       if (url.pathname === '/api/sessions') return json(res, engine.createSession(input));
       if (url.pathname === '/api/history/refresh') return json(res, await engine.syncNativeHistory());
       if (url.pathname === '/api/history/archived') return json(res, await engine.syncArchivedHistory());

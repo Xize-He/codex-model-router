@@ -23,3 +23,9 @@ test('generated HTML and unsafe links cannot execute or load external images', (
   assert.ok(!html.includes('<script')); assert.ok(!html.includes('href="javascript:')); assert.ok(!html.includes('<img'));
   assert.ok(render('[文档](https://example.com)').includes('rel="noopener noreferrer"'));
 });
+test('local file links open previews instead of relative web URLs', () => {
+  for (const target of ['C:/work/report.md', '/C:/work/report.md', 'file:///C:/work/report.md', '/tmp/report.md']) {
+    assert.ok(render(`[报告](${target})`).includes('href="#local-file"'), target);
+  }
+  assert.ok(render('[C:/work/report.md]()').includes('href="#local-file"'));
+});
