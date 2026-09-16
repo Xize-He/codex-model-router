@@ -1613,27 +1613,20 @@ export default function Home() {
                   <div className="sidebar-project-list" id="sidebar-project-list">
                     {sessionCollections.projects.map((project, index) => {
                       const projectKey = normalizeWorkspacePath(project.cwd);
+                      const projectOpen = openProjects[projectKey] ??
+                        (index === 0 || project.sessions.some((item) => item.id === selected));
                       return (
-                        <details
+                        <div
                           className="sidebar-project"
                           key={projectKey}
-                          open={
-                            openProjects[projectKey] ??
-                            (index === 0 ||
-                              project.sessions.some(
-                                (item) => item.id === selected,
-                              ))
-                          }
-                          onToggle={(event) => {
-                            const open = event.currentTarget.open;
-                            setOpenProjects((current) =>
-                              current[projectKey] === open
-                                ? current
-                                : { ...current, [projectKey]: open },
-                            );
-                          }}
+                          data-open={projectOpen}
                         >
-                          <summary
+                          <div className="sidebar-project-header">
+                          <button
+                            type="button"
+                            className="sidebar-project-toggle"
+                            aria-expanded={projectOpen}
+                            onClick={() => setOpenProjects((current) => ({ ...current, [projectKey]: !projectOpen }))}
                             title={`项目工作目录：${project.cwd}`}
                           >
                             <ChevronRight
@@ -1647,7 +1640,7 @@ export default function Home() {
                               strokeWidth={1.7}
                             />
                             <span>{project.name}</span>
-                          </summary>
+                          </button>
                           <span className="sidebar-project-info" role="tooltip">
                             <span>工作目录</span>
                             <code>{project.cwd}</code>
@@ -1695,19 +1688,22 @@ export default function Home() {
                                 onClick={() => {
                                   setOpenProjects((current) => ({
                                     ...current,
-                                    [projectKey]: false,
+                                    [projectKey]: !projectOpen,
                                   }));
                                   setProjectMenu('');
                                 }}
                               >
-                                收起会话
+                                {projectOpen ? '收起会话' : '展开会话'}
                               </button>
                             </div>
                           )}
+                          </div>
+                          {projectOpen && (
                           <div className="sidebar-project-sessions">
                             {project.sessions.map(renderSessionRow)}
                           </div>
-                        </details>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
