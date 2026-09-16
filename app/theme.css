@@ -16,7 +16,7 @@
 .session-title-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-kind-icon { display: inline-flex; flex: 0 0 16px; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; color: var(--text-secondary); vertical-align: middle; }
 .session-kind-icon img { display: block; width: 16px; height: 16px; object-fit: contain; }
-.session-kind-icon[data-brand='openai'] img { filter: invert(1); }
+.session-kind-icon[data-brand='openai'] img { width: 18px; height: 18px; filter: invert(1); }
 :root[data-theme='dark'] .session-kind-icon[data-brand='openai'] img { filter: none; }
 .header-session-kind { margin-left: 8px; }
 .sidebar { padding-top: 20px; transition: width 180ms ease, padding 180ms ease, border-color 180ms ease; }
