@@ -4,6 +4,8 @@ import { mkdirSync, readFileSync, writeFileSync, renameSync, existsSync } from '
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { CodexRPC } from './rpc.mjs';
+import { HARNESS_MODEL, harnessModel, harnessRuntime, deleteHarnessSession } from './harness.mjs';
+import { runHarness } from './harness-runner.mjs';
 import { DEEPSEEK_MODEL, DEEPSEEK_PROVIDER, deepseekModel, deepseekSettings, sessionUsesDeepseek, checkDeepseekKey } from './deepseek.mjs';
 import { McpRegistry } from './mcp.mjs';
 import { normalizeMcpServers, saveRoutingConfig } from './config.mjs';
@@ -252,7 +254,9 @@ export class Engine extends EventEmitter {
       routeEscalationGuidance: Object.fromEntries(levels.map(level => [level, this.config.routeEscalationGuidance?.[level] || ''])),
     };
     const mcpServers = this.mcpStatuses.map(server => ({ name: server.name || server.configuredName, connected: server.connected, enabled: server.enabled }));
-    return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, deepseekModel], config, cwd: this.cwd,
+    const runtime = harnessRuntime(this.root);
+    return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, harnessModel, deepseekModel], config, cwd: this.cwd,
+      harness: { installed: !!runtime, version: runtime?.version || null },
       deepseek: { configured: !!this.deepseekKey, checkedAt: this.deepseekCheckedAt, updating: this.providerUpdating },
       account: this.account, mcpServers, sessions: this.allSessions(), history: this.history, usage: this.usage, activeId: this.active?.task.id || null,
       approvals: [...this.approvals.values()].map(a => ({ id: a.id, taskId: a.taskId, kind: a.kind, title: a.title, details: a.details, questions: a.questions })) };
@@ -388,7 +392,7 @@ export class Engine extends EventEmitter {
     this.rpc.on('closed', e => {
       this.status = 'error'; this.error = e.message;
       for (const w of this.waiters.values()) w.reject(e); this.waiters.clear();
-      for (const a of this.approvals.values()) a.resolve({ approved: false }); this.approvals.clear();
+      if (this.active?.task.mode !== HARNESS_MODEL) { for (const a of this.approvals.values()) a.resolve({ approved: false }); this.approvals.clear(); }
       this.changed();
     });
     try {
@@ -720,6 +724,7 @@ export class Engine extends EventEmitter {
     if (this.active) throw new Error('请等当前任务结束后再删除会话');
     const session = this.findSession(sessionId); if (!session) throw new Error('对话不存在');
     if (session.threadId) await this.rpc.request('thread/delete', { threadId: session.threadId }, 30000);
+    if (session.engine === 'harness') deleteHarnessSession(this.root, session.id);
     this.sessions = this.sessions.filter(item => item.id !== session.id);
     this.nativeSessions = this.nativeSessions.filter(item => item.id !== session.id);
     this.nativeArchivedSessions = this.nativeArchivedSessions.filter(item => item.id !== session.id);
@@ -759,15 +764,18 @@ export class Engine extends EventEmitter {
   }
   submit({ sessionId, prompt, attachments = [], model = 'auto', effort = 'auto', approvalMode = 'approve-for-me', webSearchMode = 'auto' }) {
     if (this.providerUpdating) throw new Error('正在更新模型连接，请稍后重试');
-    if (this.status !== 'ready') throw new Error('Codex 尚未就绪');
+    if (model !== HARNESS_MODEL && this.status !== 'ready') throw new Error('Codex 尚未就绪');
     if (this.active) throw new Error('已有任务运行中，请先停止或等待完成');
     if (typeof prompt !== 'string' || prompt.length > 50000) throw new Error('问题不能超过 50000 字符');
     const resolvedAttachments = this.resolveAttachments(attachments);
     if (!prompt.trim() && !resolvedAttachments.length) throw new Error('请输入问题或添加附件');
     const routingConfig = structuredClone(this.config);
-    if (model !== 'auto') pickRoute(routingConfig, [...this.models, deepseekModel], Object.keys(routingConfig.routes || {})[0], model, effort);
+    if (model !== 'auto') pickRoute(routingConfig, [...this.models, deepseekModel, harnessModel], Object.keys(routingConfig.routes || {})[0], model, effort);
     const session = this.findSession(sessionId); if (!session) throw new Error('对话不存在');
-    const deepseek = model === DEEPSEEK_MODEL;
+    const harness = model === HARNESS_MODEL;
+    const deepseek = model === DEEPSEEK_MODEL || harness;
+    if (harness && !harnessRuntime(this.root) && !this.createHarness) throw new Error('尚未安装 DeepSeek Harness，请执行 npm run harness:install 后重试');
+    if ((session.harnessSessionId || session.engine === 'harness') && !harness || session.threadId && harness) throw new Error('此会话已绑定另一执行引擎，请新建对话后选择所需模型');
     if (deepseek && !this.deepseekKey) throw new Error('请在右侧「状态 → DeepSeek」配置 API Key 后再使用');
     if (session.threadId && sessionUsesDeepseek(session) !== deepseek) throw new Error('此会话已绑定另一模型提供商，请新建对话后选择所需模型');
     if (deepseek) { webSearchMode = 'disabled'; approvalMode = 'ask'; }
@@ -782,7 +790,7 @@ export class Engine extends EventEmitter {
     session.tasks.push(task); if (session.tasks.length === 1) session.title = task.prompt.slice(0, 28);
     session.updatedAt = Date.now();
     this.active = { task, session, routingConfig, controller: new AbortController(), threadId: null, turnId: null };
-    this.save(); this.run(this.active).catch(() => {}); return task;
+    this.save(); (harness ? runHarness(this, this.active) : this.run(this.active)).catch(() => {}); return task;
   }
   async run(ctx) {
     const { task, session } = ctx;
@@ -1064,6 +1072,7 @@ export class Engine extends EventEmitter {
     this.rpc.reject(m.id, `第一版暂不支持此交互：${m.method}`);
   }
   async interruptActive(ctx) {
+    if (ctx.task.mode === HARNESS_MODEL) return;
     if (ctx.turnId && !this.rpc.closed) await this.rpc.request('turn/interrupt', { threadId: ctx.threadId, turnId: ctx.turnId }, 10000);
   }
   async stop() {
@@ -1157,5 +1166,5 @@ export class Engine extends EventEmitter {
       return session.compaction;
     } catch (e) { if (isWriterConflict(e)) this.setOccupancy(session, true); const message = sessionError(e); session.compaction = { status: 'failed', lastAt: Date.now(), error: message }; this.changed(); throw new Error(message); }
   }
-  close() { clearTimeout(this.usageRefreshTimer); this.active?.controller.abort(); this.rpc?.close(); }
+  close() { clearTimeout(this.usageRefreshTimer); this.active?.controller.abort(); this.active?.harness?.close(); this.rpc?.close(); }
 }

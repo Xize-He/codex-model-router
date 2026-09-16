@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-export function DeepseekSettings({ configured, checkedAt, disabled }: { configured: boolean; checkedAt?: number | null; disabled: boolean }) {
+export function DeepseekSettings({ configured, checkedAt, disabled, harness }: { configured: boolean; checkedAt?: number | null; disabled: boolean; harness?: { installed: boolean; version: string | null } }) {
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -32,7 +32,9 @@ export function DeepseekSettings({ configured, checkedAt, disabled }: { configur
       </div>
       {message && <p role="status">{message}</p>}
       <p className="muted">密钥仅保留到服务关闭。长期使用可设置本机环境变量 DEEPSEEK_API_KEY。使用 DeepSeek API 独立计费。</p>
-      <p className="muted">新建对话后选择 DeepSeek V4.1 Flash。额外权限由你审批，原生网页搜索关闭。</p>
+      <p>Harness · {harness?.installed ? '已安装' : '未安装'}</p>
+      {!harness?.installed && <p className="muted">在项目目录执行 <code>npm run harness:install</code>，完成后刷新页面。</p>}
+      <p className="muted">新建对话，选择 DeepSeek V4.1 Flash · Harness。使用 Harness 的工具、会话与上下文管理；额外权限由你确认。已有 Codex 会话继续使用原引擎。</p>
     </div>
   </details></section>;
 }

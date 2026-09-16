@@ -35,9 +35,29 @@ MCP 服务由使用者自行启动，和网页分别管理。关闭浏览器或 
 
 页面输入的密钥仅保存在服务进程内存中，关闭服务后需要重新输入；也可以在启动服务前设置本机 `DEEPSEEK_API_KEY` 环境变量。密钥不会写入路由配置、会话历史或发送回浏览器。不要把真实密钥提交到仓库。
 
-DeepSeek API 独立计费，不使用 ChatGPT 套餐额度；账户用量面板仍展示 Codex 账户额度。现有 Codex 登录保留，本版仍需要已登录的 Codex 运行环境。DeepSeek 通过 Codex 自定义 Responses 提供商执行工具和维护历史，额外权限由用户审批，原生网页搜索关闭。已有会话绑定原提供商，跨提供商使用请新建对话。
+DeepSeek API 独立计费，不使用 ChatGPT 套餐额度；账户用量面板仍展示 Codex 账户额度。模型列表提供两个执行入口：**DeepSeek V4.1 Flash · Codex** 沿用 Codex 自定义 Responses 提供商；**DeepSeek V4.1 Flash · Harness** 使用官方 DeepSeek Harness。现有 Codex 登录保留。已有会话继续绑定原执行引擎，切换引擎请新建对话。
 
 接口依据：[DeepSeek Responses API 文档](https://api-docs.deepseek.com/guides/responses_api/)。模型列表检测只验证密钥和模型可用性，实际生成仍受提供商余额与服务状态影响。
+
+### 可选 DeepSeek Harness
+
+使用 **Node.js 24+**，在项目目录安装一次：
+
+```sh
+pnpm run harness:install
+# 也支持 npm run harness:install
+```
+
+安装器将官方 `@deepseek-ai/dsh@0.1.5-rc.1` 装到独立的 `data/harness-runtime/`，不会安装插件到 Codex 或修改 DeepSeek 桌面版配置。已安装独立 CLI 的用户也可在启动服务前设置 `ROUTER_HARNESS_BIN`，指向 `dsh` 可执行文件或它的 `lib/bin.js` 绝对路径。安装完成刷新页面，在新对话中选择 **DeepSeek V4.1 Flash · Harness**。
+
+- 通过官方 ACP 协议使用完整 Harness 的工具执行循环、持久化历史和自动上下文管理；无需 Codex 登录即可执行 Harness 任务。GPT 和旧 DeepSeek/Codex 会话沿用原逻辑。
+- 支持 low / high / max、文本与图片附件、项目工作目录、停止、额外权限确认，以及会话重命名、归档和删除。独立会话数据在 `data/harness-sessions/`，删除会话不会删除项目文件。
+- 复用已连接的 MCP；通过本机临时桥接转发，远端凭据不交给 Harness。非只读 MCP 工具仍需用户确认，Harness 的权限请求只允许一次，不映射为“替我审批”。Harness 自带网页工具由其运行时管理，左侧 Codex 搜索设置不控制它。
+- 页面随 ACP 的已提交消息与工具事件更新，不承诺逐 token 推送；上下文圆环仅使用实际 usage 事件。ACP 暂无压缩开始/完成事件，页面不会推测压缩时间。
+- 首版不提供 Harness 的 Codex 分支、Codex 评分以及文件差异 Review/Undo；工具执行记录和回复仍正常显示。也不在一个会话内混用 Codex 与 Harness。
+- 密钥仍只通过本机环境或服务内存提供。禁用 Harness 遥测，独立数据目录由 Git 忽略。使用测试密钥和本地模拟模型验证协议，不代表实际 API 余额或联网工具一定可用。
+
+接口依据：[官方 Harness ACP 实现](https://github.com/deepseek-ai/deepseek-harness/tree/master/packages/acp/acp)、[官方 CLI](https://github.com/deepseek-ai/deepseek-harness/tree/master/apps/cli)。测试真实运行时（不产生 API 费用）：设置 `RUN_HARNESS_TESTS=1` 后运行 `node --test tests/harness-runtime.test.mjs`。
 
 ### 默认配置
 

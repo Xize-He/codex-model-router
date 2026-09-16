@@ -169,6 +169,8 @@ type Session = {
   cwd?: string;
   model?: string | null;
   modelProvider?: string;
+  engine?: 'harness';
+  harnessSessionId?: string;
   historyLoaded?: boolean;
   historyLoading?: boolean;
   historyError?: string;
@@ -282,6 +284,7 @@ type State = {
   cwd: string;
   models: (Model & { manualOnly?: boolean })[];
   deepseek?: { configured: boolean; checkedAt: number | null; updating: boolean };
+  harness?: { installed: boolean; version: string | null };
   sessions: Session[];
   approvals: Approval[];
   account: AccountState;
@@ -799,7 +802,8 @@ export default function Home() {
   const session = state?.sessions.find((s) => s.id === selected),
     tasks = session?.tasks || [],
     last = tasks.at(-1);
-  const usingDeepseek = model === 'deepseek-flash';
+  const usingHarness = model === 'deepseek-harness/flash';
+  const usingDeepseek = model === 'deepseek-flash' || usingHarness;
   const activeWebSearchMode = usingDeepseek ? 'disabled' : webSearchMode;
   const activeApprovalMode = usingDeepseek ? 'ask' : approvalMode;
   const activeTaskIsSelected = Boolean(
@@ -934,9 +938,11 @@ export default function Home() {
   }
   useEffect(() => {
     setApprovalMode('approve-for-me');
-    if (session?.modelProvider === 'router_deepseek' || session?.model === 'deepseek-flash') {
+    if (session?.engine === 'harness') {
+      setModel('deepseek-harness/flash'); setEffort('auto');
+    } else if (session?.modelProvider === 'router_deepseek' || session?.model === 'deepseek-flash') {
       setModel('deepseek-flash'); setEffort('auto');
-    } else if (session?.threadId) setModel(current => current === 'deepseek-flash' ? 'auto' : current);
+    } else if (session?.threadId) setModel(current => current === 'deepseek-flash' || current === 'deepseek-harness/flash' ? 'auto' : current);
   }, [session?.id]);
   useEffect(() => {
     if (!sessionMenu && !projectMenu) return;
@@ -1578,10 +1584,10 @@ export default function Home() {
             </SelectContent>
           </Select>
           <Select disabled={usingDeepseek} value={activeWebSearchMode} onValueChange={(value) => value && setWebSearchMode(value as 'auto' | 'enabled' | 'disabled')}>
-            <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title="非实时搜索使用 OpenAI 网页索引；设置从下一条消息开始使用">
+            <SelectTrigger className="sidebar-preference-button" aria-label="选择联网搜索方式" title={usingHarness ? '联网工具由 DeepSeek Harness 管理' : '非实时搜索使用 OpenAI 网页索引；设置从下一条消息开始使用'}>
               <Globe2 className="sidebar-action-icon" size={18} strokeWidth={1.75} />
               <span className="sidebar-preference-label">联网搜索</span>
-              <span className="sidebar-preference-value">{{ auto: '非实时搜索', enabled: '实时搜索', disabled: '关闭搜索' }[activeWebSearchMode]}</span>
+              <span className="sidebar-preference-value">{usingHarness ? 'Harness 内置' : { auto: '非实时搜索', enabled: '实时搜索', disabled: '关闭搜索' }[activeWebSearchMode]}</span>
             </SelectTrigger>
             <SelectContent className="composer-select-content" align="start" alignItemWithTrigger={false}>
               <SelectItem className="composer-select-item" value="auto">非实时搜索</SelectItem>
@@ -2239,7 +2245,7 @@ export default function Home() {
                       <details className="route-details">
                         <summary>
                           <span className="route-model">
-                            <strong>{shortModel(task.route.model)}</strong>
+                            <strong>{task.route.model === 'deepseek-harness/flash' ? 'DeepSeek Flash · Harness' : shortModel(task.route.model)}</strong>
                             <span>· {task.route.effort}</span>
                           </span>
                           <ChevronRight className="route-chevron" size={14} />
@@ -2328,7 +2334,7 @@ export default function Home() {
                       {copiedTask === task.id ? <Check size={14} /> : <Copy size={14} />}
                       {copiedTask === task.id ? 'Copied' : 'Copy'}
                     </button>
-                    <span className="rate-control">
+                    {session?.engine !== 'harness' && <span className="rate-control">
                       <button
                         type="button"
                         className={task.rating ? 'selected' : ''}
@@ -2365,8 +2371,8 @@ export default function Home() {
                           </button>
                         </span>
                       )}
-                    </span>
-                    <button
+                    </span>}
+                    {session?.engine !== 'harness' && <button
                       type="button"
                       onClick={() => void branchReply(task)}
                       disabled={!!state?.activeId || !!session?.archived || replyActionBusy === `branch:${task.id}`}
@@ -2378,7 +2384,7 @@ export default function Home() {
                         <GitBranch size={14} />
                       )}
                       Branch
-                    </button>
+                    </button>}
                   </div>
                 )}
               </div>
@@ -2484,7 +2490,7 @@ export default function Home() {
                 </Button>
                 <div
                   className="approval-select"
-                  title="替我审批会让 Codex 自动审查工作区外的额外权限请求；不会扩大工作区或网络边界。"
+                  title={usingDeepseek ? '额外权限请求由你逐次确认' : '替我审批会让 Codex 自动审查工作区外的额外权限请求；不会扩大工作区或网络边界。'}
                 >
                   <Select
                     disabled={usingDeepseek}
@@ -2631,7 +2637,7 @@ export default function Home() {
                       uploading ||
                       !!state?.activeId ||
                       !online ||
-                      state?.status !== 'ready' ||
+                      (!usingHarness && state?.status !== 'ready') ||
                       !!session?.historyLoading ||
                       !!session?.archived ||
                       !!(session?.native && !session.historyLoaded)
@@ -2676,7 +2682,7 @@ export default function Home() {
           </div>
           {rightPanel === 'files' && <FileBrowser key={selected} sessionId={selected} cwd={session?.cwd || state?.cwd} requestedPath={requestedFile.sessionId === selected ? requestedFile.path : ''} />}
           <div hidden={rightPanel !== 'status'}>
-          <DeepseekSettings configured={!!state?.deepseek?.configured} checkedAt={state?.deepseek?.checkedAt} disabled={!!state?.activeId || !!state?.deepseek?.updating} />
+          <DeepseekSettings configured={!!state?.deepseek?.configured} checkedAt={state?.deepseek?.checkedAt} harness={state?.harness} disabled={!!state?.activeId || !!state?.deepseek?.updating} />
           <section>
             <details
               className="inspector-details"

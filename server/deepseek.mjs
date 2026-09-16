@@ -1,7 +1,7 @@
 export const DEEPSEEK_MODEL = 'deepseek-flash';
 export const DEEPSEEK_PROVIDER = 'router_deepseek';
 export const deepseekModel = {
-  model: DEEPSEEK_MODEL, displayName: 'DeepSeek V4.1 Flash',
+  model: DEEPSEEK_MODEL, displayName: 'DeepSeek V4.1 Flash · Codex',
   description: 'DeepSeek API · 独立计费', provider: DEEPSEEK_PROVIDER, manualOnly: true,
   defaultReasoningEffort: 'high', inputModalities: ['text', 'image'],
   supportedReasoningEfforts: ['low', 'high', 'max'].map(reasoningEffort => ({ reasoningEffort })),
