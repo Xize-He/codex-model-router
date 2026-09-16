@@ -15,7 +15,7 @@ function fixture() {
   const calls = [];
   e.rpc = { request: async (method, params) => { calls.push({ method, params }); return { thread: { id: 'ds-thread' } }; } };
   e.runTurn = async (ctx, threadId, params, classifier) => { assert.equal(classifier, false); calls.push({ method: 'execution', params }); };
-  return { e, s: e.createSession(), calls };
+  return { e, s: e.createSession({ kind: 'deepseek-codex' }), calls };
 }
 async function finish(e) {
   for (let i = 0; e.active && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 5));

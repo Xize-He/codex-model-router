@@ -41,7 +41,7 @@ function fixture(handlers = {}) {
     rpc.close = () => { rpc.closed = true; };
     instances.push(rpc); return rpc;
   };
-  return { e, config, s: e.createSession(), calls, instances };
+  return { e, config, s: e.createSession({ kind: 'deepseek-harness' }), calls, instances };
 }
 test('Harness runs independently of Codex, resumes its own session and never exposes credentials', async () => {
   const { e, s, calls, config } = fixture();

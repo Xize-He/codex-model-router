@@ -34,7 +34,7 @@ export function DeepseekSettings({ configured, checkedAt, disabled, harness }: {
       <p className="muted">密钥仅保留到服务关闭。长期使用可设置本机环境变量 DEEPSEEK_API_KEY。使用 DeepSeek API 独立计费。</p>
       <p>Harness · {harness?.installed ? '已安装' : '未安装'}</p>
       {!harness?.installed && <p className="muted">在项目目录执行 <code>npm run harness:install</code>，完成后刷新页面。</p>}
-      <p className="muted">新建对话，选择 DeepSeek V4.1 Flash · Harness。使用 Harness 的工具、会话与上下文管理；额外权限由你确认。已有 Codex 会话继续使用原引擎。</p>
+      <p className="muted">新建对话时选择 DeepSeek · Codex 或 DeepSeek · Harness。额外权限由你确认，已有会话保持原类型。</p>
     </div>
   </details></section>;
 }

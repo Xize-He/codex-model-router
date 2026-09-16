@@ -6,6 +6,7 @@ import path from 'node:path';
 import { CodexRPC } from './rpc.mjs';
 import { HARNESS_MODEL, harnessModel, harnessRuntime, deleteHarnessSession } from './harness.mjs';
 import { runHarness } from './harness-runner.mjs';
+import { sessionKind, validSessionKind, sessionAllowsModel } from '../lib/session-kind.mjs';
 import { DEEPSEEK_MODEL, DEEPSEEK_PROVIDER, deepseekModel, deepseekSettings, sessionUsesDeepseek, checkDeepseekKey } from './deepseek.mjs';
 import { McpRegistry } from './mcp.mjs';
 import { normalizeMcpServers, saveRoutingConfig } from './config.mjs';
@@ -258,7 +259,7 @@ export class Engine extends EventEmitter {
     return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, harnessModel, deepseekModel], config, cwd: this.cwd,
       harness: { installed: !!runtime, version: runtime?.version || null },
       deepseek: { configured: !!this.deepseekKey, checkedAt: this.deepseekCheckedAt, updating: this.providerUpdating },
-      account: this.account, mcpServers, sessions: this.allSessions(), history: this.history, usage: this.usage, activeId: this.active?.task.id || null,
+      account: this.account, mcpServers, sessions: this.allSessions().map(session => ({ ...session, kind: sessionKind(session) })), history: this.history, usage: this.usage, activeId: this.active?.task.id || null,
       approvals: [...this.approvals.values()].map(a => ({ id: a.id, taskId: a.taskId, kind: a.kind, title: a.title, details: a.details, questions: a.questions })) };
   }
   updateRoutingConfig(input = {}) {
@@ -675,11 +676,13 @@ export class Engine extends EventEmitter {
     this.mcpStatuses = await this.mcp.connectAll();
     this.changed(); return this.mcpStatuses;
   }
-  createSession({ webSearchMode = 'auto', cwd } = {}) {
+  createSession({ webSearchMode = 'auto', cwd, kind = 'gpt-codex' } = {}) {
+    if (!validSessionKind(kind)) throw new Error('会话类型无效');
     webSearchSettings(webSearchMode);
     const projectCwd = typeof cwd === 'string' ? cwd.trim() : '';
     if (projectCwd.includes('\0')) throw new Error('项目工作目录无效');
     const session = { id: randomUUID(), title: '新对话', threadId: null, tasks: [], createdAt: Date.now(), updatedAt: Date.now(), loaded: false, source: 'router', context: null, compaction: { status: 'idle', lastAt: null }, approvalMode: 'approve-for-me', appliedApprovalMode: null, webSearchMode, appliedWebSearchMode: null, ...(projectCwd ? { cwd: projectCwd } : {}) };
+    session.kind = kind;
     this.sessions.unshift(session); this.save(); return session;
   }
   async archiveSession({ sessionId }) {
@@ -778,6 +781,7 @@ export class Engine extends EventEmitter {
     if ((session.harnessSessionId || session.engine === 'harness') && !harness || session.threadId && harness) throw new Error('此会话已绑定另一执行引擎，请新建对话后选择所需模型');
     if (deepseek && !this.deepseekKey) throw new Error('请在右侧「状态 → DeepSeek」配置 API Key 后再使用');
     if (session.threadId && sessionUsesDeepseek(session) !== deepseek) throw new Error('此会话已绑定另一模型提供商，请新建对话后选择所需模型');
+    if (!sessionAllowsModel(sessionKind(session), model)) throw new Error('模型不属于此会话类型，请新建相应类型的对话');
     if (deepseek) { webSearchMode = 'disabled'; approvalMode = 'ask'; }
     if (!['ask', 'approve-for-me'].includes(approvalMode)) throw new Error('审批方式无效');
     webSearchSettings(webSearchMode);
@@ -1145,7 +1149,7 @@ export class Engine extends EventEmitter {
       id: randomUUID(), threadId: result.thread.id, title: `${session.title}（分支）`,
       tasks: structuredClone(session.tasks.slice(0, taskIndex + 1)),
       createdAt: now, updatedAt: now, loaded: true, source: 'router', cwd: session.cwd || this.cwd,
-      modelProvider: session.modelProvider,
+      modelProvider: session.modelProvider, kind: sessionKind(session),
       context: task.usage || null, compaction: { status: 'idle', lastAt: null },
       approvalMode: session.approvalMode || 'approve-for-me', appliedApprovalMode: null,
       webSearchMode: session.webSearchMode || 'auto', appliedWebSearchMode: session.appliedWebSearchMode || null,

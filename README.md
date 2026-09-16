@@ -17,7 +17,7 @@ corepack pnpm build
 
 1. 在资源管理器中双击 `启动工作台.cmd`。它不需要更改 PowerShell 执行策略。
 2. 浏览器打开 `http://127.0.0.1:7341`。首次使用时在“状态”面板登录 Codex；已登录的本机 Codex 账户会自动复用。
-3. 输入问题，默认自动分流；下拉框可选择账号当前返回的全部模型和推理强度。左侧“联网搜索”可随时选择非实时搜索、实时搜索或关闭搜索，当前对话从下一条消息开始使用新设置。Enter 发送，Shift + Enter 换行。
+3. 点击“新对话”或 Projects 目录旁的新建按钮，选择 **GPT · Codex**、**DeepSeek · Codex** 或 **DeepSeek · Harness**。会话列表和标题旁显示类型标记；创建后类型固定，模型栏只显示该类型的模型与推理强度。GPT · Codex 支持 Auto，DeepSeek 显示简短的 DeepSeek Flash。Enter 发送，Shift + Enter 换行。
 4. 模型可调用当前已连接的 MCP 工具。标注 `readOnlyHint` 的只读工具可直接执行，其他工具会展示参数并等待你批准。命令和文件操作遵循 Codex 的审批请求。
 5. “停止当前任务”中断当前分类或执行。关闭网页不会停止后台任务。要关闭服务，双击 `停止工作台.cmd`。
 
@@ -31,11 +31,11 @@ MCP 服务由使用者自行启动，和网页分别管理。关闭浏览器或 
 
 ### 可选 DeepSeek 模型
 
-手动模型列表支持 **DeepSeek V4.1 Flash**（`deepseek-flash`），推理强度为 low / high / max。打开右侧「状态 → DeepSeek」，输入自己的 API Key 并点击连接，然后新建对话选择该模型。此选项不参与自动分类和档位配置。
+支持 **DeepSeek V4.1 Flash**（`deepseek-flash`），推理强度为 low / high / max。打开右侧「状态 → DeepSeek」，输入自己的 API Key 并点击连接，然后新建对应的 DeepSeek 类型会话。模型路由配置保持全局共享，仅对 GPT · Codex 的 Auto 模式生效；DeepSeek 不参与自动分类和档位配置。
 
 页面输入的密钥仅保存在服务进程内存中，关闭服务后需要重新输入；也可以在启动服务前设置本机 `DEEPSEEK_API_KEY` 环境变量。密钥不会写入路由配置、会话历史或发送回浏览器。不要把真实密钥提交到仓库。
 
-DeepSeek API 独立计费，不使用 ChatGPT 套餐额度；账户用量面板仍展示 Codex 账户额度。模型列表提供两个执行入口：**DeepSeek V4.1 Flash · Codex** 沿用 Codex 自定义 Responses 提供商；**DeepSeek V4.1 Flash · Harness** 使用官方 DeepSeek Harness。现有 Codex 登录保留。已有会话继续绑定原执行引擎，切换引擎请新建对话。
+DeepSeek API 独立计费，不使用 ChatGPT 套餐额度；账户用量面板仍展示 Codex 账户额度。创建会话时选择 **DeepSeek · Codex** 沿用 Codex 自定义 Responses 提供商，或选择 **DeepSeek · Harness** 使用官方 DeepSeek Harness。现有 Codex 登录保留。旧会话自动识别并显示原类型，不修改标题或历史；切换引擎请新建对话。
 
 接口依据：[DeepSeek Responses API 文档](https://api-docs.deepseek.com/guides/responses_api/)。模型列表检测只验证密钥和模型可用性，实际生成仍受提供商余额与服务状态影响。
 
@@ -48,7 +48,7 @@ pnpm run harness:install
 # 也支持 npm run harness:install
 ```
 
-安装器将官方 `@deepseek-ai/dsh@0.1.5-rc.1` 装到独立的 `data/harness-runtime/`，不会安装插件到 Codex 或修改 DeepSeek 桌面版配置。已安装独立 CLI 的用户也可在启动服务前设置 `ROUTER_HARNESS_BIN`，指向 `dsh` 可执行文件或它的 `lib/bin.js` 绝对路径。安装完成刷新页面，在新对话中选择 **DeepSeek V4.1 Flash · Harness**。
+安装器将官方 `@deepseek-ai/dsh@0.1.5-rc.1` 装到独立的 `data/harness-runtime/`，不会安装插件到 Codex 或修改 DeepSeek 桌面版配置。已安装独立 CLI 的用户也可在启动服务前设置 `ROUTER_HARNESS_BIN`，指向 `dsh` 可执行文件或它的 `lib/bin.js` 绝对路径。安装完成刷新页面，新建 **DeepSeek · Harness** 类型的对话。
 
 - 通过官方 ACP 协议使用完整 Harness 的工具执行循环、持久化历史和自动上下文管理；无需 Codex 登录即可执行 Harness 任务。GPT 和旧 DeepSeek/Codex 会话沿用原逻辑。
 - 支持 low / high / max、文本与图片附件、项目工作目录、停止、额外权限确认，以及会话重命名、归档和删除。独立会话数据在 `data/harness-sessions/`，删除会话不会删除项目文件。

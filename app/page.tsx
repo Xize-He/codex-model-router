@@ -77,6 +77,8 @@ import {
 import { MarkdownAnswer } from '@/components/markdown-answer';
 import { FileBrowser } from '@/components/file-browser';
 import { DeepseekSettings } from '@/components/deepseek-settings';
+import { NewSessionDialog, type SessionKind } from '@/components/new-session-dialog';
+import { sessionKind, sessionKindLabels, sessionAllowsModel, defaultSessionModel } from '@/lib/session-kind.mjs';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -158,6 +160,7 @@ type Task = {
 };
 type Session = {
   id: string;
+  kind?: SessionKind;
   archived?: boolean;
   threadId?: string | null;
   native?: boolean;
@@ -350,7 +353,9 @@ const accountTypeText: Record<string, string> = {
   personalAccessToken: '访问令牌',
   agentIdentity: 'Agent Identity',
 };
-const shortModel = (m = '') => m.replace('gpt-', 'GPT-');
+const shortModel = (m = '') => m.startsWith('deepseek') ? 'DeepSeek Flash' : m.replace('gpt-', 'GPT-');
+const sessionLabel = (session: Session) => sessionKindLabels[sessionKind(session) as SessionKind];
+const modelLabel = (model: Model) => model.model.startsWith('deepseek') ? 'DeepSeek Flash' : model.displayName;
 const normalizeWorkspacePath = (cwd: string) => {
   const normalized = cwd.trim().replace(/\\/g, '/').replace(/\/+$/, '');
   return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
@@ -611,6 +616,7 @@ export default function Home() {
     [accountMenu, setAccountMenu] = useState(false),
     [accountBusy, setAccountBusy] = useState(''),
     [routingOpen, setRoutingOpen] = useState(false),
+    [newSessionCwd, setNewSessionCwd] = useState<string | null>(null),
     [apiKey, setApiKey] = useState(''),
     [activeTurnIndex, setActiveTurnIndex] = useState(0),
     [hoveredTurnIndex, setHoveredTurnIndex] = useState<number | null>(null),
@@ -802,8 +808,11 @@ export default function Home() {
   const session = state?.sessions.find((s) => s.id === selected),
     tasks = session?.tasks || [],
     last = tasks.at(-1);
-  const usingHarness = model === 'deepseek-harness/flash';
-  const usingDeepseek = model === 'deepseek-flash' || usingHarness;
+  const currentSessionKind = sessionKind(session);
+  const sessionModels = state?.models.filter(item => sessionAllowsModel(currentSessionKind, item.model)) || [];
+  const selectedModel = sessionModels.find(item => item.model === model);
+  const usingHarness = currentSessionKind === 'deepseek-harness';
+  const usingDeepseek = currentSessionKind !== 'gpt-codex';
   const activeWebSearchMode = usingDeepseek ? 'disabled' : webSearchMode;
   const activeApprovalMode = usingDeepseek ? 'ask' : approvalMode;
   const activeTaskIsSelected = Boolean(
@@ -938,12 +947,11 @@ export default function Home() {
   }
   useEffect(() => {
     setApprovalMode('approve-for-me');
-    if (session?.engine === 'harness') {
-      setModel('deepseek-harness/flash'); setEffort('auto');
-    } else if (session?.modelProvider === 'router_deepseek' || session?.model === 'deepseek-flash') {
-      setModel('deepseek-flash'); setEffort('auto');
-    } else if (session?.threadId) setModel(current => current === 'deepseek-flash' || current === 'deepseek-harness/flash' ? 'auto' : current);
-  }, [session?.id]);
+    if (!session) return;
+    const kind = sessionKind(session);
+    setModel(current => sessionAllowsModel(kind, current) ? current : defaultSessionModel(kind));
+    setEffort('auto');
+  }, [session?.id, session?.kind]);
   useEffect(() => {
     if (!sessionMenu && !projectMenu) return;
     const close = () => {
@@ -1042,13 +1050,17 @@ export default function Home() {
       setUploading(false);
     }
   }
-  async function create(cwd?: string) {
+  function create(cwd = '') { setNewSessionCwd(cwd); }
+  async function createTypedSession(kind: SessionKind) {
     setBusy(true);
     try {
-      const s = await post<{ id: string }>('sessions', {
+      const cwd = newSessionCwd || '';
+      const s = await post<Session>('sessions', {
+        kind,
         webSearchMode,
         ...(cwd ? { cwd } : {}),
       });
+      setState(current => current ? { ...current, sessions: [s, ...current.sessions.filter(item => item.id !== s.id)] } : current);
       sessionViewRef.current = 'active';
       setSessionView('active');
       if (cwd) {
@@ -1056,11 +1068,10 @@ export default function Home() {
         setOpenProjects((current) => ({ ...current, [projectKey]: true }));
       }
       setSelected(s.id);
-      setDraft('');
-      setAttachments([]);
+      setModel(defaultSessionModel(kind)); setEffort('auto');
+      if (selected) { setDraft(''); setAttachments([]); }
+      setNewSessionCwd(null);
       setError('');
-    } catch (e) {
-      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -1068,17 +1079,12 @@ export default function Home() {
   async function send() {
     if ((!draft.trim() && !attachments.length) || busy || uploading || state?.activeId || session?.archived)
       return;
+    if (!selected) { create(); return; }
     setBusy(true);
     setError('');
     try {
-      let id = selected;
-      if (!id) {
-        const s = await post<{ id: string }>('sessions', { webSearchMode });
-        id = s.id;
-        setSelected(id);
-      }
       await post('submit', {
-        sessionId: id,
+        sessionId: selected,
         prompt: draft,
         attachments: attachments.map(({ id }) => ({ id })),
         model,
@@ -1419,7 +1425,7 @@ export default function Home() {
           }}
         >
           <span className="session-copy">
-            <span>{item.title}</span>
+            <span className="session-title-line"><span>{item.title}</span><small className="session-kind-badge">{sessionLabel(item)}</small></span>
             {(item.occupancyChecking || item.occupied) && (
               <small>
                 {item.occupancyChecking ? (
@@ -1995,6 +2001,7 @@ export default function Home() {
               </Button>
             )}
             {session?.title || '新对话'}
+            {session && <span className="session-kind-badge header-session-kind">{sessionLabel(session)}</span>}
             <span className="version">V3</span>
             {session?.occupied && (
               <span className="source-chip occupied-chip" title="该会话正由 Codex 桌面版或其他客户端持有">
@@ -2063,7 +2070,7 @@ export default function Home() {
                     className={item.id === selected ? 'selected' : ''}
                     onClick={() => chooseSearchResult(item)}
                   >
-                    <span>{item.title}</span>
+                    <span>{item.title} <span className="session-kind-badge">{sessionLabel(item)}</span></span>
                     <small>
                       {item.archived
                         ? '已归档'
@@ -2245,7 +2252,7 @@ export default function Home() {
                       <details className="route-details">
                         <summary>
                           <span className="route-model">
-                            <strong>{task.route.model === 'deepseek-harness/flash' ? 'DeepSeek Flash · Harness' : shortModel(task.route.model)}</strong>
+                            <strong>{shortModel(task.route.model)}</strong>
                             <span>· {task.route.effort}</span>
                           </span>
                           <ChevronRight className="route-chevron" size={14} />
@@ -2579,7 +2586,7 @@ export default function Home() {
                       <span className="composer-select-value">
                         {model === 'auto'
                           ? 'Auto'
-                          : `${state?.models.find((item) => item.model === model)?.displayName || model} ${effort === 'auto'
+                          : `${selectedModel ? modelLabel(selectedModel) : shortModel(model)} ${effort === 'auto'
                             ? state?.models.find((item) => item.model === model)?.defaultReasoningEffort || ''
                             : effort}`}
                       </span>
@@ -2590,12 +2597,12 @@ export default function Home() {
                       align="end"
                       alignItemWithTrigger={false}
                     >
-                    <SelectItem className="composer-select-item" value="auto">Auto</SelectItem>
-                    {state?.models.map((item) => (
+                    {currentSessionKind === 'gpt-codex' && <SelectItem className="composer-select-item" value="auto">Auto</SelectItem>}
+                    {sessionModels.map((item) => (
                       <SelectGroup key={item.model}>
-                        <SelectLabel>{item.displayName}</SelectLabel>
+                        <SelectLabel>{modelLabel(item)}</SelectLabel>
                         <SelectItem className="composer-select-item" value={`${item.model}::auto`}>
-                          {item.displayName} {item.defaultReasoningEffort}
+                          {modelLabel(item)} {item.defaultReasoningEffort}
                         </SelectItem>
                         {item.supportedReasoningEfforts
                           .filter(
@@ -2609,7 +2616,7 @@ export default function Home() {
                               key={option.reasoningEffort}
                               value={`${item.model}::${option.reasoningEffort}`}
                             >
-                              {item.displayName} {option.reasoningEffort}
+                              {modelLabel(item)} {option.reasoningEffort}
                             </SelectItem>
                           ))}
                       </SelectGroup>
@@ -2821,6 +2828,7 @@ export default function Home() {
         csrfToken={csrf.current}
         onSaved={onRoutingSaved}
       />
+      <NewSessionDialog cwd={newSessionCwd} onClose={() => setNewSessionCwd(null)} onCreate={createTypedSession} />
       <AlertDialog
         open={!!renameTarget}
         onOpenChange={(open) => {

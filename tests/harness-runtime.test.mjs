@@ -51,7 +51,7 @@ test('real Harness executes a tool, persists and resumes context through ACP', {
   let engine;
   try {
     engine = setup();
-    const session = engine.createSession();
+    const session = engine.createSession({ kind: 'deepseek-harness' });
     const first = engine.submit({ sessionId: session.id, prompt: 'Remember ROUTER_HARNESS_CONTEXT_MARKER, and write the smoke file.', model: HARNESS_MODEL, effort: 'low' });
     await finish(engine); assert.equal(first.status, 'completed', first.error);
     assert.equal(readFileSync(file, 'utf8'), 'Harness smoke OK\n');

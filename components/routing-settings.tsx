@@ -380,7 +380,7 @@ export const RoutingSettings = memo(function RoutingSettings({
         <DialogHeader className="routing-settings-header">
           <DialogTitle>模型路由配置</DialogTitle>
           <DialogDescription>
-            按任务复杂度选择模型，遇到新的复杂问题时自动升档。
+            全局配置，仅适用于 GPT · Codex 会话。
           </DialogDescription>
           {routingError && (
             <p className="inline-error" role="alert">
