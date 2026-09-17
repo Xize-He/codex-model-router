@@ -814,7 +814,7 @@ export default function Home() {
   const usingHarness = currentSessionKind === 'deepseek-harness';
   const usingDeepseek = currentSessionKind !== 'gpt-codex';
   const activeWebSearchMode = usingDeepseek ? 'disabled' : webSearchMode;
-  const activeApprovalMode = usingDeepseek ? 'ask' : approvalMode;
+  const activeApprovalMode = approvalMode;
   const activeTaskIsSelected = Boolean(
     state?.activeId && tasks.some((task) => task.id === state.activeId),
   );
@@ -2497,10 +2497,9 @@ export default function Home() {
                 </Button>
                 <div
                   className="approval-select"
-                  title={usingDeepseek ? '额外权限请求由你逐次确认' : '替我审批会让 Codex 自动审查工作区外的额外权限请求；不会扩大工作区或网络边界。'}
+                  title={usingHarness ? 'Approve for me 会自动允许 Harness 的单次工具权限；MCP 写入仍会询问。' : '替我审批会让 Codex 自动审查工作区外的额外权限请求；不会扩大工作区或网络边界。'}
                 >
                   <Select
-                    disabled={usingDeepseek}
                     value={activeApprovalMode}
                     onValueChange={(value) =>
                       value &&

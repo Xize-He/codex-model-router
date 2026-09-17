@@ -54,9 +54,12 @@ export async function runHarness(engine, ctx) {
           const call = calls.get(p.toolCall?.toolCallId);
           // Without the correlated call, the client cannot show what is being authorized.
           if (call) {
-            const details = JSON.parse(clean(JSON.stringify({ tool: call.title, input: call.rawInput })));
-            const answer = await engine.ask(ctx, 'harness', 'Harness 请求额外权限', details);
-            const kind = answer.approved && alive() ? 'allow_once' : 'reject_once';
+            let approved = task.approvalMode === 'approve-for-me';
+            if (!approved) {
+              const details = JSON.parse(clean(JSON.stringify({ tool: call.title, input: call.rawInput })));
+              approved = (await engine.ask(ctx, 'harness', 'Harness 请求额外权限', details)).approved;
+            }
+            const kind = approved && alive() ? 'allow_once' : 'reject_once';
             const option = p.options?.find(o => o.kind === kind);
             if (option) outcome = { outcome: 'selected', optionId: option.optionId };
           }

@@ -769,7 +769,7 @@ export class Engine extends EventEmitter {
     if ((session.harnessSessionId || session.engine === 'harness') && !harness || session.threadId && harness) throw new Error('此会话已绑定另一执行引擎，请新建对话后选择所需模型');
     if (harness && !this.deepseekKey) throw new Error('请在右侧「状态 → DeepSeek」配置 API Key 后再使用');
     if (!sessionAllowsModel(sessionKind(session), model)) throw new Error('模型不属于此会话类型，请新建相应类型的对话');
-    if (harness) { webSearchMode = 'disabled'; approvalMode = 'ask'; }
+    if (harness) webSearchMode = 'disabled';
     if (!['ask', 'approve-for-me'].includes(approvalMode)) throw new Error('审批方式无效');
     webSearchSettings(webSearchMode);
     if (session.native && !session.historyLoaded) throw new Error('请等待原生会话历史加载完成');

@@ -52,7 +52,7 @@ pnpm run harness:install
 
 - 通过官方 ACP 协议使用完整 Harness 的工具执行循环、持久化历史和自动上下文管理；无需 Codex 登录即可执行 Harness 任务。GPT 会话继续使用 Codex。
 - 支持 low / high / max、文本与图片附件、项目工作目录、停止、额外权限确认，以及会话重命名、归档和删除。独立会话数据在 `data/harness-sessions/`，删除会话不会删除项目文件。
-- 复用已连接的 MCP；通过本机临时桥接转发，远端凭据不交给 Harness。非只读 MCP 工具仍需用户确认，Harness 的权限请求只允许一次，不映射为“替我审批”。Harness 自带网页工具由其运行时管理，左侧 Codex 搜索设置不控制它。
+- 复用已连接的 MCP；通过本机临时桥接转发，远端凭据不交给 Harness。选择 **Approve for me** 时，Harness 的已关联工具权限请求会自动允许一次；选择 **Ask for approval** 时逐次确认。异常或无法关联具体工具的请求会拒绝，非只读 MCP 工具仍需用户确认。Harness 自带网页工具由其运行时管理，左侧 Codex 搜索设置不控制它。
 - 页面随 ACP 的已提交消息与工具事件更新，不承诺逐 token 推送；上下文圆环仅使用实际 usage 事件。ACP 暂无压缩开始/完成事件，页面不会推测压缩时间。
 - 首版不提供 Harness 的 Codex 分支、Codex 评分以及文件差异 Review/Undo；工具执行记录和回复仍正常显示。也不在一个会话内混用 Codex 与 Harness。
 - 密钥仍只通过本机环境或服务内存提供。禁用 Harness 遥测，独立数据目录由 Git 忽略。使用测试密钥和本地模拟模型验证协议，不代表实际 API 余额或联网工具一定可用。

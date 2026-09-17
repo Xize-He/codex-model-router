@@ -76,7 +76,7 @@ test('Harness permission approval is explicit, one-shot, and rejects unknown cal
     rpc.emit('notification', { method: 'session/update', params: { sessionId: 'h-session', update: { sessionUpdate: 'tool_call', toolCallId: 'call', title: 'pwsh', rawInput: { command: 'test' } } } });
     rpc.emit('request', { id: 1, method: 'session/request_permission', params: { sessionId: 'h-session', toolCall: { toolCallId: 'call' }, options: [{ kind: 'allow_once', optionId: 'yes' }, { kind: 'reject_once', optionId: 'no' }] } });
   }) });
-  e.submit({ sessionId: s.id, prompt: 'hello', model: HARNESS_MODEL });
+  e.submit({ sessionId: s.id, prompt: 'hello', model: HARNESS_MODEL, approvalMode: 'ask' });
   await until(() => e.approvals.size === 1);
   assert.equal(e.active.task.status, 'waiting');
   e.answer([...e.approvals.keys()][0], { approved: false });
@@ -87,6 +87,19 @@ test('Harness permission approval is explicit, one-shot, and rejects unknown cal
   assert.equal(calls.find(c => c.id === 2).result.outcome.outcome, 'cancelled');
   await e.stop(); resolvePrompt({ stopReason: 'cancelled' }); await until(() => !e.active);
   assert.equal(e.approvals.size, 0); assert.ok(calls.some(c => c.method === 'session/cancel'));
+});
+test('Harness Approve for me automatically selects one-shot permission without opening an approval', async () => {
+  let resolvePrompt;
+  const { e, s, calls } = fixture({ 'session/prompt': rpc => new Promise(r => {
+    resolvePrompt = r;
+    rpc.emit('notification', { method: 'session/update', params: { sessionId: 'h-session', update: { sessionUpdate: 'tool_call', toolCallId: 'call', title: 'pwsh', rawInput: { command: 'test' } } } });
+    rpc.emit('request', { id: 1, method: 'session/request_permission', params: { sessionId: 'h-session', toolCall: { toolCallId: 'call' }, options: [{ kind: 'allow_once', optionId: 'yes' }, { kind: 'reject_once', optionId: 'no' }] } });
+  }) });
+  e.submit({ sessionId: s.id, prompt: 'hello', model: HARNESS_MODEL, approvalMode: 'approve-for-me' });
+  await until(() => calls.some(c => c.method === 'response'));
+  assert.equal(calls.find(c => c.method === 'response').result.outcome.optionId, 'yes');
+  assert.equal(e.approvals.size, 0);
+  await e.stop(); resolvePrompt({ stopReason: 'cancelled' }); await until(() => !e.active);
 });
 test('Harness MCP bridge retains write approval and refuses unauthenticated clients', async () => {
   const { e, s } = fixture(); let invoked = 0;
