@@ -48,6 +48,7 @@ import {
   ArchiveRestore,
   Trash2,
   LockKeyhole,
+  Unplug,
   Maximize2,
   LogIn,
   LogOut,
@@ -1259,6 +1260,18 @@ export default function Home() {
       setSessionActionBusy('');
     }
   }
+  async function releaseCodexSessions(target: Session) {
+    setSessionActionBusy(target.id);
+    try {
+      setError('');
+      await post('sessions/release-codex');
+      setSessionMenu('');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSessionActionBusy('');
+    }
+  }
   async function confirmDeleteSession() {
     if (!deleteTarget) return;
     const target = deleteTarget;
@@ -1495,6 +1508,16 @@ export default function Home() {
               )}
               {item.archived ? '恢复会话' : '归档会话'}
             </button>
+            {sessionKind(item) === 'gpt-codex' && item.threadId && (
+              <button
+                title="关闭网页内部的 Codex 连接并立即释放全部 Codex 会话；网页服务不会重启"
+                disabled={!!state?.activeId || sessionActionBusy === item.id}
+                onClick={() => void releaseCodexSessions(item)}
+              >
+                <Unplug size={14} />
+                释放给桌面版
+              </button>
+            )}
             <button
               className="danger"
               disabled={!!state?.activeId || sessionActionBusy === item.id}

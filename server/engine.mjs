@@ -220,6 +220,7 @@ export class Engine extends EventEmitter {
     this.deepseekKey = process.env.DEEPSEEK_API_KEY?.trim() || '';
     this.deepseekCheckedAt = null;
     this.providerUpdating = false;
+    this.codexReconnecting = false;
     this.history = { loading: true, error: null, lastSyncedAt: null, truncated: false, archivedLoading: false, archivedLoaded: false, occupancyLoading: false, occupancyLastCheckedAt: null };
     this.usage = { loading: true, error: null, limits: [], resetCredits: null, updatedAt: null };
     this.account = { loading: true, authenticated: false, requiresOpenaiAuth: true, type: null, email: null, planType: null, credentialSource: null, error: null, login: null };
@@ -256,7 +257,7 @@ export class Engine extends EventEmitter {
     };
     const mcpServers = this.mcpStatuses.map(server => ({ name: server.name || server.configuredName, connected: server.connected, enabled: server.enabled }));
     const runtime = harnessRuntime(this.root);
-    return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, harnessModel], config, cwd: this.cwd,
+    return { app: 'local-model-router', version: '0.3.0', status: this.status, error: this.error, models: [...this.models, harnessModel], config, cwd: this.cwd, codexReconnecting: this.codexReconnecting,
       harness: { installed: !!runtime, version: runtime?.version || null },
       deepseek: { configured: !!this.deepseekKey, checkedAt: this.deepseekCheckedAt, updating: this.providerUpdating },
       account: this.account, mcpServers, sessions: this.allSessions().map(session => ({ ...session, kind: sessionKind(session) })), history: this.history, usage: this.usage, activeId: this.active?.task.id || null,
@@ -417,6 +418,34 @@ export class Engine extends EventEmitter {
       }
       return { ok: true };
     } finally { this.providerUpdating = false; this.changed(); }
+  }
+  async releaseCodexSessions() {
+    if (this.active) throw new Error('请等待当前任务结束后再释放 Codex 会话');
+    if (this.codexReconnecting || this.providerUpdating || this.account.login || this.authLoadPromise || this.authFinishPromise || this.historyPromise || this.archivedHistoryPromise || this.occupancyPromise || this.allSessions().some(session => session.compaction?.status === 'running')) throw new Error('Codex 正在处理其他操作，请稍后重试');
+    this.codexReconnecting = true; this.status = 'starting'; this.error = null; this.changed();
+    try {
+      clearTimeout(this.usageRefreshTimer);
+      const released = this.allSessions().filter(session => sessionKind(session) === 'gpt-codex' && session.threadId && session.loaded).length;
+      for (const session of this.allSessions()) {
+        if (sessionKind(session) !== 'gpt-codex') continue;
+        session.loaded = false; session.appliedApprovalMode = null; session.appliedWebSearchMode = null;
+      }
+      const previous = this.rpc;
+      if (previous) {
+        previous.removeAllListeners?.();
+        const stopped = new Promise(resolve => {
+          let settled = false;
+          const done = () => { if (!settled) { settled = true; resolve(); } };
+          previous.child?.once?.('exit', done);
+          setTimeout(done, 3000).unref();
+        });
+        previous.close();
+        await stopped;
+      }
+      await this.initialize();
+      if (!['ready', 'signed-out'].includes(this.status)) throw new Error(this.error || 'Codex 重新连接失败');
+      return { ok: true, released };
+    } finally { this.codexReconnecting = false; this.changed(); }
   }
   async refreshAccount(refreshToken = false) {
     this.account = { ...this.account, loading: true, error: null }; this.changed();

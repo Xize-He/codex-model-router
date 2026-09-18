@@ -20,6 +20,7 @@ corepack pnpm build
 3. 点击“新对话”或 Projects 目录旁的新建按钮，选择 **GPT · Codex** 或 **DeepSeek · Harness**。会话列表和标题旁显示类型标记；创建后类型固定，模型栏只显示该类型的模型与推理强度。GPT · Codex 支持 Auto，DeepSeek 显示为 DeepSeek Flash · Harness。Enter 发送，Shift + Enter 换行。
 4. 模型可调用当前已连接的 MCP 工具。标注 `readOnlyHint` 的只读工具可直接执行，其他工具会展示参数并等待你批准。命令和文件操作遵循 Codex 的审批请求。
 5. “停止当前任务”中断当前分类或执行。关闭网页不会停止后台任务。要关闭服务，双击 `停止工作台.cmd`。
+6. 网页加载过的 Codex 会话会由其内部 app-server 持有。在会话菜单选择“释放给桌面版”会只重建内部 Codex 连接并立即释放全部 Codex 会话，不重启网页服务；DeepSeek Harness 会话不受影响。
 
 `out/` 是本机构建产物，不提交到 Git。完成上述安装与构建后，日常使用只需运行启动脚本。启动脚本会查找系统 PATH 和本机 Codex 自带的 Node / Codex 程序。
 

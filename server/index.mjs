@@ -94,6 +94,7 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/sessions/unarchive') return json(res, await engine.unarchiveSession(input));
       if (url.pathname === '/api/sessions/rename') return json(res, await engine.renameSession(input));
       if (url.pathname === '/api/sessions/delete') return json(res, await engine.deleteSession(input));
+      if (url.pathname === '/api/sessions/release-codex') return json(res, await engine.releaseCodexSessions());
       if (url.pathname === '/api/submit') return json(res, engine.submit(input));
       if (url.pathname === '/api/rate') return json(res, await engine.rateTask(input));
       if (url.pathname === '/api/branch') return json(res, await engine.branchTask(input));

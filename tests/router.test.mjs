@@ -131,6 +131,24 @@ test('occupied sessions are rechecked with an isolated probe and normal sessions
   assert.equal(occupied.occupied, false);
   assert.equal(occupied.loaded, false);
 });
+test('releasing Codex sessions recycles only the Codex client and preserves Harness state', async () => {
+  const e = engine(), codex = e.createSession(), harness = e.createSession({ kind: 'deepseek-harness' });
+  codex.threadId = 'codex-thread'; codex.loaded = true; codex.appliedApprovalMode = 'ask'; codex.appliedWebSearchMode = 'live';
+  harness.engine = 'harness'; harness.harnessSessionId = 'harness-session'; harness.loaded = true;
+  let exit, closed = false, initialized = false;
+  e.rpc = {
+    removeAllListeners() {},
+    child: { once(event, listener) { assert.equal(event, 'exit'); exit = listener; } },
+    close() { closed = true; setImmediate(exit); },
+  };
+  e.initialize = async () => { initialized = true; e.status = 'ready'; };
+  const result = await e.releaseCodexSessions();
+  assert.deepEqual(result, { ok: true, released: 1 });
+  assert.equal(closed, true); assert.equal(initialized, true);
+  assert.equal(codex.loaded, false); assert.equal(codex.appliedApprovalMode, null); assert.equal(codex.appliedWebSearchMode, null);
+  assert.equal(harness.loaded, true); assert.equal(harness.harnessSessionId, 'harness-session');
+  assert.equal(e.codexReconnecting, false);
+});
 test('classifier result is constrained and unavailable models do not silently fall back', () => {
   const levels = Object.keys(config.routes);
   assert.deepEqual(parseRoute('{"level":"instant","reason":"短问答"}', levels), { level: 'instant', reason: '短问答' });
